@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Rule, RuleType, Client } from '../lib/types';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,15 +18,32 @@ interface RuleFormProps {
 
 const CATEGORY_ID = 71; // Default category ID as per PRD
 
+const generateStatement = (ruleType: RuleType, inputs: Record<string, string>) => {
+  if (ruleType.name.toLowerCase() === 'exclude_text') {
+    const phrase = inputs['phrase'] || '';
+    return `If phrase is ${phrase}, Then phrase is ${phrase}`;
+  }
+  // Add more rule type statement templates as needed
+  return '';
+};
+
 const RuleForm = ({ rule, client, ruleTypes, onSave, onCancel }: RuleFormProps) => {
   const isEditing = !!rule;
   const initialRuleType = rule ? ruleTypes.find(rt => rt.ruletype_id === rule.ruletype_id) : null;
   
   const [selectedRuleType, setSelectedRuleType] = useState<RuleType | null>(initialRuleType);
   const [statement, setStatement] = useState(rule?.statement || '');
+  const [validFrom, setValidFrom] = useState(rule?.valid_from || '');
+
+  useEffect(() => {
+    if (selectedRuleType) {
+      const newStatement = generateStatement(selectedRuleType, inputs);
+      setStatement(newStatement);
+    }
+  }, [selectedRuleType, inputs]);
+
   const [ruleDescription, setRuleDescription] = useState(rule?.rule_description || '');
   const [regex, setRegex] = useState(rule?.regex || '');
-  const [validFrom, setValidFrom] = useState(rule?.valid_from || new Date().toISOString().substring(0, 10));
   const [validTill, setValidTill] = useState(rule?.valid_till || '');
   const [inputs, setInputs] = useState<Record<string, string>>(
     rule?.inputs ? 
@@ -65,7 +81,6 @@ const RuleForm = ({ rule, client, ruleTypes, onSave, onCancel }: RuleFormProps) 
       return;
     }
 
-    // Convert inputs back to their appropriate types
     const processedInputs: Record<string, string | number | boolean> = {};
     Object.entries(inputs).forEach(([key, value]) => {
       if (!isNaN(Number(value))) {
@@ -146,7 +161,6 @@ const RuleForm = ({ rule, client, ruleTypes, onSave, onCancel }: RuleFormProps) 
                   variant="ghost"
                   size="icon"
                   onClick={() => removeInputField(key)}
-                  className="h-10 w-10"
                 >
                   <X className="h-4 w-4" />
                 </Button>
@@ -167,10 +181,9 @@ const RuleForm = ({ rule, client, ruleTypes, onSave, onCancel }: RuleFormProps) 
           <Label htmlFor="statement">Statement</Label>
           <Textarea
             id="statement"
-            placeholder="e.g., If phrase is Test1234, Then phrase is Test1234"
             value={statement}
-            onChange={(e) => setStatement(e.target.value)}
-            className="h-24"
+            readOnly
+            className="h-24 bg-gray-50"
           />
         </div>
 

@@ -1,7 +1,10 @@
 
+import { useState } from 'react';
 import { Rule, RuleType } from '../lib/types';
 import RuleCard from './RuleCard';
-import { mockRuleTypes } from '../data/mockData';
+import { Input } from '@/components/ui/input';
+import { Search } from 'lucide-react';
+import { Card } from '@/components/ui/card';
 
 interface RulesListProps {
   rules: Rule[];
@@ -10,30 +13,71 @@ interface RulesListProps {
 }
 
 const RulesList = ({ rules, onEditRule, onDeleteRule }: RulesListProps) => {
-  // Find the rule type for each rule
-  const getRuleType = (ruletype_id: number): RuleType | undefined => {
-    return mockRuleTypes.find(rt => rt.ruletype_id === ruletype_id);
-  };
+  const [selectedRule, setSelectedRule] = useState<Rule | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
-  if (rules.length === 0) {
+  const filteredRules = rules.filter(rule => {
+    const searchLower = searchTerm.toLowerCase();
     return (
-      <div className="text-center p-8 bg-gray-50 rounded-lg border border-dashed border-gray-300">
-        <p className="text-gray-500">No rules found for the selected criteria.</p>
-      </div>
+      Object.values(rule.inputs).some(value => 
+        value.toString().toLowerCase().includes(searchLower)
+      ) ||
+      rule.statement.toLowerCase().includes(searchLower)
     );
-  }
+  });
 
   return (
     <div className="space-y-4">
-      {rules.map(rule => (
-        <RuleCard
-          key={rule.rule_id}
-          rule={rule}
-          ruleType={getRuleType(rule.ruletype_id)}
-          onEdit={onEditRule}
-          onDelete={onDeleteRule}
+      <div className="relative">
+        <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+        <Input
+          placeholder="Search rules by input parameters or statement..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="pl-10"
         />
-      ))}
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-2 max-h-[calc(100vh-300px)] overflow-y-auto pr-2">
+          {filteredRules.length === 0 ? (
+            <Card className="p-8 text-center">
+              <p className="text-gray-500">No rules found for the selected criteria.</p>
+            </Card>
+          ) : (
+            filteredRules.map(rule => (
+              <button
+                key={rule.rule_id}
+                onClick={() => setSelectedRule(rule)}
+                className="w-full text-left"
+              >
+                <Card
+                  className={`p-4 hover:bg-gray-50 transition-colors ${
+                    selectedRule?.rule_id === rule.rule_id ? 'border-primary' : ''
+                  }`}
+                >
+                  <p className="font-medium">{rule.statement}</p>
+                  <div className="mt-2 text-sm text-gray-500">
+                    {Object.entries(rule.inputs).map(([key, value]) => (
+                      <div key={key}>{key}: {value}</div>
+                    ))}
+                  </div>
+                </Card>
+              </button>
+            ))
+          )}
+        </div>
+
+        {selectedRule && (
+          <div className="sticky top-0">
+            <RuleCard
+              rule={selectedRule}
+              onEdit={onEditRule}
+              onDelete={onDeleteRule}
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 };
