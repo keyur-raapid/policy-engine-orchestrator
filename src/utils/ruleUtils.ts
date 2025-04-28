@@ -103,3 +103,140 @@ export const generateStatement = (ruleType: { name: string }, inputs: Record<str
       return `If ${conditions}, Then apply rule: ${ruleType.name}`;
   }
 };
+
+/**
+ * Get custom form configuration for a specific rule type
+ * @param ruleTypeName The name of the rule type
+ * @returns Form configuration for the rule type
+ */
+export interface InputFieldConfig {
+  fieldType: 'text' | 'checkbox' | 'select' | 'number' | 'textarea';
+  label: string;
+  placeholder?: string;
+  options?: Array<{ value: string; label: string }>;
+  key: string;
+  required?: boolean;
+}
+
+export const getFormConfigForRuleType = (ruleTypeName: string): InputFieldConfig[] => {
+  const type = ruleTypeName.toLowerCase();
+
+  switch (type) {
+    case 'excludetext':
+    case 'exclude_text':
+      return [
+        {
+          fieldType: 'text',
+          label: 'Phrase to exclude',
+          placeholder: 'Enter phrase',
+          key: 'phrase',
+          required: true
+        }
+      ];
+
+    case 'phrasesrule':
+    case 'phrases_rule':
+      return [
+        {
+          fieldType: 'text',
+          label: 'Phrase',
+          placeholder: 'Enter phrase',
+          key: 'phrase',
+          required: true
+        },
+        {
+          fieldType: 'checkbox',
+          label: 'Critical',
+          key: 'critical'
+        }
+      ];
+
+    case 'allergiesrule':
+    case 'allergies_rule':
+      return [
+        {
+          fieldType: 'text',
+          label: 'Allergen',
+          placeholder: 'Enter allergen',
+          key: 'allergen',
+          required: true
+        },
+        {
+          fieldType: 'checkbox',
+          label: 'Severe',
+          key: 'severe'
+        }
+      ];
+
+    case 'conditionalvalidation':
+    case 'conditional_validation':
+      return [
+        {
+          fieldType: 'text',
+          label: 'Condition',
+          placeholder: 'Enter condition',
+          key: 'condition',
+          required: true
+        },
+        {
+          fieldType: 'text',
+          label: 'Value',
+          placeholder: 'Enter value',
+          key: 'value',
+          required: true
+        }
+      ];
+    
+    case 'lessspecificcodebasedonstatistics':
+    case 'less_specific_code_based_on_statistics':
+      return [
+        {
+          fieldType: 'text',
+          label: 'Code',
+          placeholder: 'Enter code',
+          key: 'code',
+          required: true
+        },
+        {
+          fieldType: 'select',
+          label: 'Level',
+          key: 'level',
+          options: [
+            { value: '1', label: 'Level 1' },
+            { value: '2', label: 'Level 2' },
+            { value: '3', label: 'Level 3' }
+          ]
+        }
+      ];
+    
+    default:
+      // For unknown rule types, return a generic input field
+      return [
+        {
+          fieldType: 'text',
+          label: 'Input',
+          placeholder: 'Enter value',
+          key: 'input'
+        }
+      ];
+  }
+};
+
+/**
+ * Generate validation rules for specific form fields based on rule type
+ * @param ruleTypeName The name of the rule type 
+ * @returns Validation rules for the form
+ */
+export const getValidationRulesForRuleType = (ruleTypeName: string): Record<string, { required?: boolean }> => {
+  const formConfig = getFormConfigForRuleType(ruleTypeName);
+  
+  const validationRules: Record<string, { required?: boolean }> = {};
+  
+  formConfig.forEach(field => {
+    if (field.required) {
+      validationRules[field.key] = { required: true };
+    }
+  });
+  
+  return validationRules;
+};

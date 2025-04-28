@@ -10,7 +10,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Check, X, Plus, Trash2 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
-import { getDefaultInputsForRuleType, generateStatement } from '../utils/ruleUtils';
+import { 
+  getDefaultInputsForRuleType, 
+  generateStatement, 
+  getFormConfigForRuleType,
+  InputFieldConfig,
+  getValidationRulesForRuleType
+} from '../utils/ruleUtils';
 
 interface RuleFormProps {
   rule?: Rule;
@@ -27,12 +33,14 @@ const RuleForm = ({ rule, client, ruleTypes, onSave, onCancel }: RuleFormProps) 
   const isEditing = !!rule;
   const initialRuleType = rule ? ruleTypes.find(rt => rt.ruletype_id === rule.ruletype_id) : null;
   
+  const [selectedRuleType, setSelectedRuleType] = useState<RuleType | null>(initialRuleType);
+  const [formConfig, setFormConfig] = useState<InputFieldConfig[]>([]);
   const [ruleDescription, setRuleDescription] = useState(rule?.rule_description || '');
   const [regex, setRegex] = useState(rule?.regex || '');
   const [validFrom, setValidFrom] = useState(rule?.valid_from || '');
   const [validTill, setValidTill] = useState(rule?.valid_till || '');
-  const [selectedRuleType, setSelectedRuleType] = useState<RuleType | null>(initialRuleType);
   const [statement, setStatement] = useState(rule?.statement || '');
+  const [errors, setErrors] = useState<Record<string, string>>({});
   
   const [inputs, setInputs] = useState<Record<string, string>>(
     rule?.inputs ? 
@@ -40,14 +48,19 @@ const RuleForm = ({ rule, client, ruleTypes, onSave, onCancel }: RuleFormProps) 
       acc[key] = value.toString();
       return acc;
     }, {} as Record<string, string>) : 
-    { phrase: '' }
+    {}
   );
 
   useEffect(() => {
-    // When rule type changes, update inputs with default values for that rule type
-    if (selectedRuleType && !isEditing) {
-      const defaultInputs = getDefaultInputsForRuleType(selectedRuleType.name);
-      setInputs(defaultInputs);
+    // When rule type changes, update form configuration and inputs with default values for that rule type
+    if (selectedRuleType) {
+      const config = getFormConfigForRuleType(selectedRuleType.name);
+      setFormConfig(config);
+      
+      if (!isEditing) {
+        const defaultInputs = getDefaultInputsForRuleType(selectedRuleType.name);
+        setInputs(defaultInputs);
+      }
     }
   }, [selectedRuleType, isEditing]);
 
@@ -58,35 +71,14 @@ const RuleForm = ({ rule, client, ruleTypes, onSave, onCancel }: RuleFormProps) 
     }
   }, [selectedRuleType, inputs]);
 
-  const addInputField = () => {
-    const newKey = `input_${Object.keys(inputs).length + 1}`;
-    setInputs(prev => ({ ...prev, [newKey]: '' }));
-  };
-
-  const updateInputKey = (oldKey: string, newKey: string) => {
-    if (newKey && newKey !== oldKey && !inputs.hasOwnProperty(newKey)) {
-      const { [oldKey]: value, ...rest } = inputs;
-      setInputs({ ...rest, [newKey]: value });
-    }
-  };
-
-  const updateInputValue = (key: string, value: string) => {
-    setInputs(prev => ({ ...prev, [key]: value }));
-  };
-
-  const removeInputField = (key: string) => {
-    const { [key]: _, ...rest } = inputs;
-    setInputs(rest);
-  };
-
-  const handleSave = () => {
+  const validateForm = () => {
     if (!selectedRuleType) {
       toast({
         title: "Missing Rule Type",
         description: "Please select a rule type",
         variant: "destructive"
       });
-      return;
+      return false;
     }
 
     if (!statement) {
@@ -95,7 +87,7 @@ const RuleForm = ({ rule, client, ruleTypes, onSave, onCancel }: RuleFormProps) 
         description: "Rule statement cannot be empty",
         variant: "destructive"
       });
-      return;
+      return false;
     }
 
     if (!validFrom || !validTill) {
@@ -104,6 +96,58 @@ const RuleForm = ({ rule, client, ruleTypes, onSave, onCancel }: RuleFormProps) 
         description: "Please provide valid from and valid till dates",
         variant: "destructive"
       });
+      return false;
+    }
+
+    // Field-specific validation based on rule type
+    const validationRules = getValidationRulesForRuleType(selectedRuleType.name);
+    const newErrors: Record<string, string> = {};
+    
+    Object.entries(validationRules).forEach(([field, rules]) => {
+      if (rules.required && (!inputs[field] || inputs[field].trim() === '')) {
+        newErrors[field] = `${field} is required`;
+      }
+    });
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const updateInputValue = (key: string, value: string | boolean) => {
+    setInputs(prev => ({
+      ...prev,
+      [key]: value.toString()
+    }));
+    
+    // Clear error for this field if it exists
+    if (errors[key]) {
+      setErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[key];
+        return newErrors;
+      });
+    }
+  };
+
+  const addCustomInputField = () => {
+    const newKey = `custom_${Object.keys(inputs).length + 1}`;
+    setInputs(prev => ({ ...prev, [newKey]: '' }));
+  };
+
+  const updateCustomInputKey = (oldKey: string, newKey: string) => {
+    if (newKey && newKey !== oldKey && !inputs.hasOwnProperty(newKey)) {
+      const { [oldKey]: value, ...rest } = inputs;
+      setInputs({ ...rest, [newKey]: value });
+    }
+  };
+
+  const removeCustomInputField = (key: string) => {
+    const { [key]: _, ...rest } = inputs;
+    setInputs(rest);
+  };
+
+  const handleSave = () => {
+    if (!validateForm()) {
       return;
     }
 
@@ -122,7 +166,7 @@ const RuleForm = ({ rule, client, ruleTypes, onSave, onCancel }: RuleFormProps) 
       ...rule,
       project_id: client.project_id,
       category_id: CATEGORY_ID,
-      ruletype_id: selectedRuleType.ruletype_id,
+      ruletype_id: selectedRuleType!.ruletype_id,
       statement,
       rule_description: ruleDescription,
       regex: regex || undefined,
@@ -134,126 +178,155 @@ const RuleForm = ({ rule, client, ruleTypes, onSave, onCancel }: RuleFormProps) 
     onSave(updatedRule);
   };
 
-  const renderCustomInputFields = () => {
-    if (!selectedRuleType) return null;
+  // Render dynamic form fields based on rule type
+  const renderDynamicFields = () => {
+    if (!selectedRuleType || formConfig.length === 0) {
+      return (
+        <div className="space-y-2 mt-4">
+          <p className="text-sm text-gray-500">Select a rule type to see its specific fields.</p>
+        </div>
+      );
+    }
 
-    switch (selectedRuleType.name.toLowerCase()) {
-      case 'excludetext':
-      case 'exclude_text':
-        return (
-          <div className="space-y-2">
-            <Label>Phrase to exclude</Label>
-            <Input
-              placeholder="Enter phrase"
-              value={inputs.phrase || ''}
-              onChange={(e) => updateInputValue('phrase', e.target.value)}
-            />
+    return (
+      <div className="space-y-4 mt-4">
+        <h3 className="font-medium">Rule Type Fields</h3>
+        {formConfig.map((field) => (
+          <div key={field.key} className="space-y-2">
+            {renderField(field)}
+            {errors[field.key] && (
+              <p className="text-sm text-red-500">{errors[field.key]}</p>
+            )}
           </div>
-        );
-      
-      case 'phrasesrule':
-      case 'phrases_rule':
-        return (
-          <div className="space-y-2">
-            <Label>Phrases</Label>
-            <Input
-              placeholder="Enter phrase"
-              value={inputs.phrase || ''}
-              onChange={(e) => updateInputValue('phrase', e.target.value)}
-            />
-            <div className="flex items-center space-x-2">
-              <Checkbox 
-                id="critical" 
-                checked={inputs.critical === 'true'} 
-                onCheckedChange={(checked) => updateInputValue('critical', checked ? 'true' : 'false')}
-              />
-              <Label htmlFor="critical">Critical</Label>
-            </div>
-          </div>
-        );
-      
-      case 'allergiesrule':
-      case 'allergies_rule':
-        return (
-          <div className="space-y-2">
-            <Label>Allergen</Label>
-            <Input
-              placeholder="Enter allergen"
-              value={inputs.allergen || ''}
-              onChange={(e) => updateInputValue('allergen', e.target.value)}
-            />
-            <div className="flex items-center space-x-2">
-              <Checkbox 
-                id="severe" 
-                checked={inputs.severe === 'true'} 
-                onCheckedChange={(checked) => updateInputValue('severe', checked ? 'true' : 'false')}
-              />
-              <Label htmlFor="severe">Severe</Label>
-            </div>
-          </div>
-        );
-      
-      case 'conditionalvalidation':
-      case 'conditional_validation':
-        return (
-          <div className="space-y-2">
-            <Label>Condition</Label>
-            <Input
-              placeholder="Enter condition"
-              value={inputs.condition || ''}
-              onChange={(e) => updateInputValue('condition', e.target.value)}
-            />
-            <Label>Value</Label>
-            <Input
-              placeholder="Enter value"
-              value={inputs.value || ''}
-              onChange={(e) => updateInputValue('value', e.target.value)}
-            />
-          </div>
-        );
-      
-      default:
-        // For custom or unknown rule types, show the generic key-value input fields
-        return (
-          <div className="space-y-2">
-            <Label>Inputs</Label>
-            <div className="space-y-2">
-              {Object.entries(inputs).map(([key, value]) => (
-                <div key={key} className="flex gap-2">
-                  <Input
-                    placeholder="Key"
-                    value={key}
-                    onChange={(e) => updateInputKey(key, e.target.value)}
-                    className="w-1/3"
-                  />
-                  <Input
-                    placeholder="Value"
-                    value={value}
-                    onChange={(e) => updateInputValue(key, e.target.value)}
-                    className="flex-1"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => removeInputField(key)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
+        ))}
+        
+        {/* Custom fields section for advanced users */}
+        {selectedRuleType.name.toLowerCase() === 'custom' && (
+          <div className="space-y-2 mt-6 border-t pt-4">
+            <div className="flex justify-between items-center">
+              <h3 className="font-medium">Custom Fields</h3>
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={addInputField}
+                onClick={addCustomInputField}
               >
                 <Plus className="mr-2 h-4 w-4" />
-                Add Input
+                Add Custom Field
               </Button>
             </div>
+            
+            {Object.entries(inputs).filter(([key]) => key.startsWith('custom_')).map(([key, value]) => (
+              <div key={key} className="flex gap-2">
+                <Input
+                  placeholder="Key"
+                  value={key.replace('custom_', '')}
+                  onChange={(e) => updateCustomInputKey(key, `custom_${e.target.value}`)}
+                  className="w-1/3"
+                />
+                <Input
+                  placeholder="Value"
+                  value={value}
+                  onChange={(e) => updateInputValue(key, e.target.value)}
+                  className="flex-1"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => removeCustomInputField(key)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Render a specific field based on its configuration
+  const renderField = (field: InputFieldConfig) => {
+    const value = inputs[field.key] || '';
+    
+    switch (field.fieldType) {
+      case 'text':
+        return (
+          <>
+            <Label htmlFor={field.key}>{field.label}</Label>
+            <Input
+              id={field.key}
+              placeholder={field.placeholder || `Enter ${field.label.toLowerCase()}`}
+              value={value}
+              onChange={(e) => updateInputValue(field.key, e.target.value)}
+            />
+          </>
+        );
+        
+      case 'number':
+        return (
+          <>
+            <Label htmlFor={field.key}>{field.label}</Label>
+            <Input
+              id={field.key}
+              type="number"
+              placeholder={field.placeholder || `Enter ${field.label.toLowerCase()}`}
+              value={value}
+              onChange={(e) => updateInputValue(field.key, e.target.value)}
+            />
+          </>
+        );
+        
+      case 'textarea':
+        return (
+          <>
+            <Label htmlFor={field.key}>{field.label}</Label>
+            <Textarea
+              id={field.key}
+              placeholder={field.placeholder || `Enter ${field.label.toLowerCase()}`}
+              value={value}
+              onChange={(e) => updateInputValue(field.key, e.target.value)}
+            />
+          </>
+        );
+        
+      case 'checkbox':
+        return (
+          <div className="flex items-center space-x-2">
+            <Checkbox 
+              id={field.key} 
+              checked={value === 'true'} 
+              onCheckedChange={(checked) => updateInputValue(field.key, checked ? 'true' : 'false')}
+            />
+            <Label htmlFor={field.key}>{field.label}</Label>
           </div>
         );
+        
+      case 'select':
+        return (
+          <>
+            <Label htmlFor={field.key}>{field.label}</Label>
+            <Select
+              value={value}
+              onValueChange={(newValue) => updateInputValue(field.key, newValue)}
+            >
+              <SelectTrigger id={field.key}>
+                <SelectValue placeholder={`Select ${field.label.toLowerCase()}`} />
+              </SelectTrigger>
+              <SelectContent>
+                {field.options?.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </>
+        );
+        
+      default:
+        return null;
     }
   };
 
@@ -288,16 +361,17 @@ const RuleForm = ({ rule, client, ruleTypes, onSave, onCancel }: RuleFormProps) 
           </Select>
         </div>
 
-        {renderCustomInputFields()}
+        {renderDynamicFields()}
 
-        <div className="space-y-2">
-          <Label htmlFor="statement">Statement</Label>
+        <div className="space-y-2 mt-4 border-t pt-4">
+          <Label htmlFor="statement">Rule Statement</Label>
           <Textarea
             id="statement"
             value={statement}
             readOnly
             className="h-24 bg-gray-50"
           />
+          <p className="text-sm text-gray-500">Statement is automatically generated based on rule type and inputs.</p>
         </div>
 
         <div className="space-y-2">
