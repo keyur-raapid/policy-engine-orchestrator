@@ -16,7 +16,7 @@ const RuleTypeSelector = ({ ruleTypes, selectedRuleType, onSelectRuleType }: Rul
       <Select
         value={selectedRuleType ? selectedRuleType.ruletype_id.toString() : ''}
         onValueChange={(value) => {
-          if (value === '') {
+          if (value === 'all') {
             onSelectRuleType(null);
             return;
           }
@@ -30,7 +30,7 @@ const RuleTypeSelector = ({ ruleTypes, selectedRuleType, onSelectRuleType }: Rul
           <SelectValue placeholder="Select a rule type" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="">All Rule Types</SelectItem>
+          <SelectItem value="all">All Rule Types</SelectItem>
           {ruleTypes.map((ruleType) => (
             <SelectItem key={ruleType.ruletype_id} value={ruleType.ruletype_id.toString()}>
               {ruleType.name}
