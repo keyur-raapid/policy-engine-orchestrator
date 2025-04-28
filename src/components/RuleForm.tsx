@@ -7,7 +7,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Check, X } from 'lucide-react';
+import { Check, X, Plus, Trash2 } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { useToast } from '@/hooks/use-toast';
+import { getDefaultInputsForRuleType, generateStatement } from '../utils/ruleUtils';
 
 interface RuleFormProps {
   rule?: Rule;
@@ -19,16 +22,8 @@ interface RuleFormProps {
 
 const CATEGORY_ID = 71; // Default category ID as per PRD
 
-const generateStatement = (ruleType: RuleType, inputsObj: Record<string, string>) => {
-  if (ruleType.name.toLowerCase() === 'exclude_text') {
-    const phrase = inputsObj['phrase'] || '';
-    return `If phrase is ${phrase}, Then phrase is ${phrase}`;
-  }
-  // Add more rule type statement templates as needed
-  return '';
-};
-
 const RuleForm = ({ rule, client, ruleTypes, onSave, onCancel }: RuleFormProps) => {
+  const { toast } = useToast();
   const isEditing = !!rule;
   const initialRuleType = rule ? ruleTypes.find(rt => rt.ruletype_id === rule.ruletype_id) : null;
   
@@ -47,6 +42,14 @@ const RuleForm = ({ rule, client, ruleTypes, onSave, onCancel }: RuleFormProps) 
     }, {} as Record<string, string>) : 
     { phrase: '' }
   );
+
+  useEffect(() => {
+    // When rule type changes, update inputs with default values for that rule type
+    if (selectedRuleType && !isEditing) {
+      const defaultInputs = getDefaultInputsForRuleType(selectedRuleType.name);
+      setInputs(defaultInputs);
+    }
+  }, [selectedRuleType, isEditing]);
 
   useEffect(() => {
     if (selectedRuleType) {
@@ -77,8 +80,30 @@ const RuleForm = ({ rule, client, ruleTypes, onSave, onCancel }: RuleFormProps) 
   };
 
   const handleSave = () => {
-    if (!selectedRuleType || !statement || !validFrom || !validTill) {
-      alert('Please fill all required fields');
+    if (!selectedRuleType) {
+      toast({
+        title: "Missing Rule Type",
+        description: "Please select a rule type",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!statement) {
+      toast({
+        title: "Missing Statement",
+        description: "Rule statement cannot be empty",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!validFrom || !validTill) {
+      toast({
+        title: "Missing Dates",
+        description: "Please provide valid from and valid till dates",
+        variant: "destructive"
+      });
       return;
     }
 
@@ -107,6 +132,129 @@ const RuleForm = ({ rule, client, ruleTypes, onSave, onCancel }: RuleFormProps) 
     };
 
     onSave(updatedRule);
+  };
+
+  const renderCustomInputFields = () => {
+    if (!selectedRuleType) return null;
+
+    switch (selectedRuleType.name.toLowerCase()) {
+      case 'excludetext':
+      case 'exclude_text':
+        return (
+          <div className="space-y-2">
+            <Label>Phrase to exclude</Label>
+            <Input
+              placeholder="Enter phrase"
+              value={inputs.phrase || ''}
+              onChange={(e) => updateInputValue('phrase', e.target.value)}
+            />
+          </div>
+        );
+      
+      case 'phrasesrule':
+      case 'phrases_rule':
+        return (
+          <div className="space-y-2">
+            <Label>Phrases</Label>
+            <Input
+              placeholder="Enter phrase"
+              value={inputs.phrase || ''}
+              onChange={(e) => updateInputValue('phrase', e.target.value)}
+            />
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="critical" 
+                checked={inputs.critical === 'true'} 
+                onCheckedChange={(checked) => updateInputValue('critical', checked ? 'true' : 'false')}
+              />
+              <Label htmlFor="critical">Critical</Label>
+            </div>
+          </div>
+        );
+      
+      case 'allergiesrule':
+      case 'allergies_rule':
+        return (
+          <div className="space-y-2">
+            <Label>Allergen</Label>
+            <Input
+              placeholder="Enter allergen"
+              value={inputs.allergen || ''}
+              onChange={(e) => updateInputValue('allergen', e.target.value)}
+            />
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="severe" 
+                checked={inputs.severe === 'true'} 
+                onCheckedChange={(checked) => updateInputValue('severe', checked ? 'true' : 'false')}
+              />
+              <Label htmlFor="severe">Severe</Label>
+            </div>
+          </div>
+        );
+      
+      case 'conditionalvalidation':
+      case 'conditional_validation':
+        return (
+          <div className="space-y-2">
+            <Label>Condition</Label>
+            <Input
+              placeholder="Enter condition"
+              value={inputs.condition || ''}
+              onChange={(e) => updateInputValue('condition', e.target.value)}
+            />
+            <Label>Value</Label>
+            <Input
+              placeholder="Enter value"
+              value={inputs.value || ''}
+              onChange={(e) => updateInputValue('value', e.target.value)}
+            />
+          </div>
+        );
+      
+      default:
+        // For custom or unknown rule types, show the generic key-value input fields
+        return (
+          <div className="space-y-2">
+            <Label>Inputs</Label>
+            <div className="space-y-2">
+              {Object.entries(inputs).map(([key, value]) => (
+                <div key={key} className="flex gap-2">
+                  <Input
+                    placeholder="Key"
+                    value={key}
+                    onChange={(e) => updateInputKey(key, e.target.value)}
+                    className="w-1/3"
+                  />
+                  <Input
+                    placeholder="Value"
+                    value={value}
+                    onChange={(e) => updateInputValue(key, e.target.value)}
+                    className="flex-1"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => removeInputField(key)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={addInputField}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Add Input
+              </Button>
+            </div>
+          </div>
+        );
+    }
   };
 
   return (
@@ -140,43 +288,7 @@ const RuleForm = ({ rule, client, ruleTypes, onSave, onCancel }: RuleFormProps) 
           </Select>
         </div>
 
-        <div className="space-y-2">
-          <Label>Inputs</Label>
-          <div className="space-y-2">
-            {Object.entries(inputs).map(([key, value]) => (
-              <div key={key} className="flex gap-2">
-                <Input
-                  placeholder="Key"
-                  value={key}
-                  onChange={(e) => updateInputKey(key, e.target.value)}
-                  className="w-1/3"
-                />
-                <Input
-                  placeholder="Value"
-                  value={value}
-                  onChange={(e) => updateInputValue(key, e.target.value)}
-                  className="flex-1"
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => removeInputField(key)}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            ))}
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={addInputField}
-            >
-              Add Input
-            </Button>
-          </div>
-        </div>
+        {renderCustomInputFields()}
 
         <div className="space-y-2">
           <Label htmlFor="statement">Statement</Label>
