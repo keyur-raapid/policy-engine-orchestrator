@@ -28,6 +28,7 @@ export interface Rule {
   category_id: number;
   ruletype_id: number;
   inputs: RuleInput;
+  statement?: string;
   rule_description?: string;
   regex?: string;
   valid_from?: string;

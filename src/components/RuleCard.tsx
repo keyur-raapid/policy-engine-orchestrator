@@ -43,10 +43,12 @@ const RuleCard = ({ rule, ruleType, onEdit, onDelete }: RuleCardProps) => {
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div>
-          <p className="font-medium">Statement</p>
-          <p className="text-gray-700">{rule.statement}</p>
-        </div>
+        {rule.statement && (
+          <div>
+            <p className="font-medium">Statement</p>
+            <p className="text-gray-700">{rule.statement}</p>
+          </div>
+        )}
         
         <div>
           <p className="font-medium">Inputs</p>
