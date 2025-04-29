@@ -10,7 +10,6 @@ import { useToast } from '@/hooks/use-toast';
 import ICDCodeInput from './ICDCodeInput';
 import { 
   getDefaultInputsForRuleType, 
-  generateStatement, 
   getFormConfigForRuleType,
   InputFieldConfig,
   getValidationRulesForRuleType
@@ -33,7 +32,6 @@ const RuleForm = ({ rule, client, ruleTypes, onSave, onCancel }: RuleFormProps) 
   
   const [selectedRuleType, setSelectedRuleType] = useState<RuleType | null>(initialRuleType);
   const [formConfig, setFormConfig] = useState<InputFieldConfig[]>([]);
-  const [statement, setStatement] = useState(rule?.statement || '');
   const [errors, setErrors] = useState<Record<string, string>>({});
   
   const [inputs, setInputs] = useState<Record<string, string>>(
@@ -58,27 +56,11 @@ const RuleForm = ({ rule, client, ruleTypes, onSave, onCancel }: RuleFormProps) 
     }
   }, [selectedRuleType, isEditing]);
 
-  useEffect(() => {
-    if (selectedRuleType) {
-      const newStatement = generateStatement(selectedRuleType, inputs);
-      setStatement(newStatement);
-    }
-  }, [selectedRuleType, inputs]);
-
   const validateForm = () => {
     if (!selectedRuleType) {
       toast({
         title: "Missing Rule Type",
         description: "Please select a rule type",
-        variant: "destructive"
-      });
-      return false;
-    }
-
-    if (!statement) {
-      toast({
-        title: "Missing Statement",
-        description: "Rule statement cannot be empty",
         variant: "destructive"
       });
       return false;
@@ -129,7 +111,6 @@ const RuleForm = ({ rule, client, ruleTypes, onSave, onCancel }: RuleFormProps) 
       project_id: client.project_id,
       category_id: CATEGORY_ID,
       ruletype_id: selectedRuleType!.ruletype_id,
-      statement,
       inputs: processedInputs,
       version: rule?.version || 1,
     };
@@ -227,13 +208,6 @@ const RuleForm = ({ rule, client, ruleTypes, onSave, onCancel }: RuleFormProps) 
         </div>
 
         {renderDynamicFields()}
-
-        <div className="space-y-2 mt-4 pt-4 border-t">
-          <Label htmlFor="statement">Rule Statement</Label>
-          <div id="statement" className="p-3 bg-gray-50 rounded-md min-h-[50px]">
-            {statement || <span className="text-gray-400">Rule statement will appear here</span>}
-          </div>
-        </div>
       </CardContent>
       <CardFooter className="justify-between">
         <Button variant="outline" onClick={onCancel}>

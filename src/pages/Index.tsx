@@ -120,6 +120,15 @@ const Index = () => {
     setRuleTypes([...ruleTypes, ruleType]);
   };
 
+  const handleDeleteRuleType = (ruleTypeId: number) => {
+    setRuleTypes(ruleTypes.filter(rt => rt.ruletype_id !== ruleTypeId));
+    
+    // If the currently selected rule type is deleted, reset the selection
+    if (selectedRuleType && selectedRuleType.ruletype_id === ruleTypeId) {
+      setSelectedRuleType(null);
+    }
+  };
+
   const handleToggleRuleTypeManager = () => {
     setShowRuleTypeManager(!showRuleTypeManager);
     if (!showRuleTypeManager) {
@@ -223,7 +232,10 @@ const Index = () => {
             {showRuleTypeManager && (
               <RuleTypeManager
                 ruleTypes={ruleTypes}
+                rules={rules}
+                clientId={selectedClient?.project_id}
                 onAddRuleType={handleAddRuleType}
+                onDeleteRuleType={handleDeleteRuleType}
               />
             )}
           </TabsContent>

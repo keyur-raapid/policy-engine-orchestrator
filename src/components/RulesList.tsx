@@ -18,11 +18,8 @@ const RulesList = ({ rules, onEditRule, onDeleteRule }: RulesListProps) => {
 
   const filteredRules = rules.filter(rule => {
     const searchLower = searchTerm.toLowerCase();
-    return (
-      Object.values(rule.inputs).some(value => 
-        value.toString().toLowerCase().includes(searchLower)
-      ) ||
-      rule.statement.toLowerCase().includes(searchLower)
+    return Object.values(rule.inputs).some(value => 
+      value.toString().toLowerCase().includes(searchLower)
     );
   });
 
@@ -31,7 +28,7 @@ const RulesList = ({ rules, onEditRule, onDeleteRule }: RulesListProps) => {
       <div className="relative">
         <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
         <Input
-          placeholder="Search rules by input parameters or statement..."
+          placeholder="Search rules by input parameters..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="pl-10"
@@ -56,10 +53,11 @@ const RulesList = ({ rules, onEditRule, onDeleteRule }: RulesListProps) => {
                     selectedRule?.rule_id === rule.rule_id ? 'border-primary' : ''
                   }`}
                 >
-                  <p className="font-medium">{rule.statement}</p>
-                  <div className="mt-2 text-sm text-gray-500">
+                  <div className="mt-2 text-sm">
                     {Object.entries(rule.inputs).map(([key, value]) => (
-                      <div key={key}>{key}: {value}</div>
+                      <div key={key} className="mb-1">
+                        <span className="font-medium">{key}:</span> {value}
+                      </div>
                     ))}
                   </div>
                 </Card>

@@ -23,26 +23,6 @@ export const getDefaultInputsForRuleType = (ruleType: RuleType): Record<string, 
 };
 
 /**
- * Generate a rule statement based on rule type and inputs
- * @param ruleType The rule type object
- * @param inputs Key-value pairs of inputs
- * @returns Generated statement string
- */
-export const generateStatement = (ruleType: RuleType, inputs: Record<string, string>): string => {
-  if (!ruleType.customFields || ruleType.customFields.length === 0) {
-    return '';
-  }
-
-  // Create a simple statement joining all field values
-  const parts = ruleType.customFields.map(field => {
-    const value = inputs[field.key] || '';
-    return `${field.label}: ${value}`;
-  });
-
-  return `${ruleType.name}: ${parts.join(' | ')}`;
-};
-
-/**
  * Form field configuration
  */
 export interface InputFieldConfig {
@@ -91,4 +71,14 @@ export const getValidationRulesForRuleType = (ruleType: RuleType): Record<string
   });
   
   return validationRules;
+};
+
+/**
+ * Count rules for a specific rule type
+ * @param rules All rules
+ * @param ruleTypeId The rule type ID
+ * @returns Number of rules for the specified rule type
+ */
+export const countRulesForRuleType = (rules: any[], ruleTypeId: number): number => {
+  return rules.filter(rule => rule.ruletype_id === ruleTypeId).length;
 };
