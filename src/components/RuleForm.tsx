@@ -5,11 +5,9 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Check, X, Plus, Trash2 } from 'lucide-react';
-import { Checkbox } from '@/components/ui/checkbox';
+import { Check, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import ICDCodeInput from './ICDCodeInput';
 import { 
   getDefaultInputsForRuleType, 
   generateStatement, 
@@ -35,10 +33,6 @@ const RuleForm = ({ rule, client, ruleTypes, onSave, onCancel }: RuleFormProps) 
   
   const [selectedRuleType, setSelectedRuleType] = useState<RuleType | null>(initialRuleType);
   const [formConfig, setFormConfig] = useState<InputFieldConfig[]>([]);
-  const [ruleDescription, setRuleDescription] = useState(rule?.rule_description || '');
-  const [regex, setRegex] = useState(rule?.regex || '');
-  const [validFrom, setValidFrom] = useState(rule?.valid_from || '');
-  const [validTill, setValidTill] = useState(rule?.valid_till || '');
   const [statement, setStatement] = useState(rule?.statement || '');
   const [errors, setErrors] = useState<Record<string, string>>({});
   
@@ -54,11 +48,11 @@ const RuleForm = ({ rule, client, ruleTypes, onSave, onCancel }: RuleFormProps) 
   useEffect(() => {
     // When rule type changes, update form configuration and inputs with default values for that rule type
     if (selectedRuleType) {
-      const config = getFormConfigForRuleType(selectedRuleType.name);
+      const config = getFormConfigForRuleType(selectedRuleType);
       setFormConfig(config);
       
       if (!isEditing) {
-        const defaultInputs = getDefaultInputsForRuleType(selectedRuleType.name);
+        const defaultInputs = getDefaultInputsForRuleType(selectedRuleType);
         setInputs(defaultInputs);
       }
     }
@@ -90,17 +84,8 @@ const RuleForm = ({ rule, client, ruleTypes, onSave, onCancel }: RuleFormProps) 
       return false;
     }
 
-    if (!validFrom || !validTill) {
-      toast({
-        title: "Missing Dates",
-        description: "Please provide valid from and valid till dates",
-        variant: "destructive"
-      });
-      return false;
-    }
-
     // Field-specific validation based on rule type
-    const validationRules = getValidationRulesForRuleType(selectedRuleType.name);
+    const validationRules = getValidationRulesForRuleType(selectedRuleType);
     const newErrors: Record<string, string> = {};
     
     Object.entries(validationRules).forEach(([field, rules]) => {
@@ -129,23 +114,6 @@ const RuleForm = ({ rule, client, ruleTypes, onSave, onCancel }: RuleFormProps) 
     }
   };
 
-  const addCustomInputField = () => {
-    const newKey = `custom_${Object.keys(inputs).length + 1}`;
-    setInputs(prev => ({ ...prev, [newKey]: '' }));
-  };
-
-  const updateCustomInputKey = (oldKey: string, newKey: string) => {
-    if (newKey && newKey !== oldKey && !inputs.hasOwnProperty(newKey)) {
-      const { [oldKey]: value, ...rest } = inputs;
-      setInputs({ ...rest, [newKey]: value });
-    }
-  };
-
-  const removeCustomInputField = (key: string) => {
-    const { [key]: _, ...rest } = inputs;
-    setInputs(rest);
-  };
-
   const handleSave = () => {
     if (!validateForm()) {
       return;
@@ -153,13 +121,7 @@ const RuleForm = ({ rule, client, ruleTypes, onSave, onCancel }: RuleFormProps) 
 
     const processedInputs: Record<string, string | number | boolean> = {};
     Object.entries(inputs).forEach(([key, value]) => {
-      if (!isNaN(Number(value))) {
-        processedInputs[key] = Number(value);
-      } else if (value.toLowerCase() === 'true' || value.toLowerCase() === 'false') {
-        processedInputs[key] = value.toLowerCase() === 'true';
-      } else {
-        processedInputs[key] = value;
-      }
+      processedInputs[key] = value;
     });
 
     const updatedRule: Partial<Rule> = {
@@ -168,11 +130,8 @@ const RuleForm = ({ rule, client, ruleTypes, onSave, onCancel }: RuleFormProps) 
       category_id: CATEGORY_ID,
       ruletype_id: selectedRuleType!.ruletype_id,
       statement,
-      rule_description: ruleDescription,
-      regex: regex || undefined,
-      valid_from: validFrom,
-      valid_till: validTill,
-      inputs: processedInputs
+      inputs: processedInputs,
+      version: rule?.version || 1,
     };
 
     onSave(updatedRule);
@@ -190,7 +149,7 @@ const RuleForm = ({ rule, client, ruleTypes, onSave, onCancel }: RuleFormProps) 
 
     return (
       <div className="space-y-4 mt-4">
-        <h3 className="font-medium">Rule Type Fields</h3>
+        <h3 className="font-medium">{selectedRuleType.name} Fields</h3>
         {formConfig.map((field) => (
           <div key={field.key} className="space-y-2">
             {renderField(field)}
@@ -199,49 +158,6 @@ const RuleForm = ({ rule, client, ruleTypes, onSave, onCancel }: RuleFormProps) 
             )}
           </div>
         ))}
-        
-        {/* Custom fields section for advanced users */}
-        {selectedRuleType.name.toLowerCase() === 'custom' && (
-          <div className="space-y-2 mt-6 border-t pt-4">
-            <div className="flex justify-between items-center">
-              <h3 className="font-medium">Custom Fields</h3>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={addCustomInputField}
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Add Custom Field
-              </Button>
-            </div>
-            
-            {Object.entries(inputs).filter(([key]) => key.startsWith('custom_')).map(([key, value]) => (
-              <div key={key} className="flex gap-2">
-                <Input
-                  placeholder="Key"
-                  value={key.replace('custom_', '')}
-                  onChange={(e) => updateCustomInputKey(key, `custom_${e.target.value}`)}
-                  className="w-1/3"
-                />
-                <Input
-                  placeholder="Value"
-                  value={value}
-                  onChange={(e) => updateInputValue(key, e.target.value)}
-                  className="flex-1"
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => removeCustomInputField(key)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
     );
   };
@@ -264,64 +180,15 @@ const RuleForm = ({ rule, client, ruleTypes, onSave, onCancel }: RuleFormProps) 
           </>
         );
         
-      case 'number':
+      case 'icdCode':
         return (
           <>
             <Label htmlFor={field.key}>{field.label}</Label>
-            <Input
-              id={field.key}
-              type="number"
+            <ICDCodeInput
+              value={value}
+              onChange={(newValue) => updateInputValue(field.key, newValue)}
               placeholder={field.placeholder || `Enter ${field.label.toLowerCase()}`}
-              value={value}
-              onChange={(e) => updateInputValue(field.key, e.target.value)}
             />
-          </>
-        );
-        
-      case 'textarea':
-        return (
-          <>
-            <Label htmlFor={field.key}>{field.label}</Label>
-            <Textarea
-              id={field.key}
-              placeholder={field.placeholder || `Enter ${field.label.toLowerCase()}`}
-              value={value}
-              onChange={(e) => updateInputValue(field.key, e.target.value)}
-            />
-          </>
-        );
-        
-      case 'checkbox':
-        return (
-          <div className="flex items-center space-x-2">
-            <Checkbox 
-              id={field.key} 
-              checked={value === 'true'} 
-              onCheckedChange={(checked) => updateInputValue(field.key, checked ? 'true' : 'false')}
-            />
-            <Label htmlFor={field.key}>{field.label}</Label>
-          </div>
-        );
-        
-      case 'select':
-        return (
-          <>
-            <Label htmlFor={field.key}>{field.label}</Label>
-            <Select
-              value={value}
-              onValueChange={(newValue) => updateInputValue(field.key, newValue)}
-            >
-              <SelectTrigger id={field.key}>
-                <SelectValue placeholder={`Select ${field.label.toLowerCase()}`} />
-              </SelectTrigger>
-              <SelectContent>
-                {field.options?.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </>
         );
         
@@ -338,85 +205,41 @@ const RuleForm = ({ rule, client, ruleTypes, onSave, onCancel }: RuleFormProps) 
       <CardContent className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="rule-type">Rule Type</Label>
-          <Select
-            value={selectedRuleType ? selectedRuleType.ruletype_id.toString() : ''}
-            onValueChange={(value) => {
-              const ruleType = ruleTypes.find(rt => rt.ruletype_id.toString() === value);
+          <select
+            id="rule-type"
+            value={selectedRuleType ? selectedRuleType.ruletype_id : ''}
+            onChange={(e) => {
+              const ruleType = ruleTypes.find(rt => rt.ruletype_id.toString() === e.target.value);
               if (ruleType) {
                 setSelectedRuleType(ruleType);
               }
             }}
-            disabled={isEditing} // Can't change rule type when editing
+            disabled={isEditing}
+            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
           >
-            <SelectTrigger id="rule-type">
-              <SelectValue placeholder="Select a rule type" />
-            </SelectTrigger>
-            <SelectContent>
-              {ruleTypes.map((ruleType) => (
-                <SelectItem key={ruleType.ruletype_id} value={ruleType.ruletype_id.toString()}>
-                  {ruleType.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            <option value="">Select a rule type</option>
+            {ruleTypes.map((ruleType) => (
+              <option key={ruleType.ruletype_id} value={ruleType.ruletype_id}>
+                {ruleType.name}
+              </option>
+            ))}
+          </select>
         </div>
 
         {renderDynamicFields()}
 
-        <div className="space-y-2 mt-4 border-t pt-4">
+        <div className="space-y-2 mt-4 pt-4 border-t">
           <Label htmlFor="statement">Rule Statement</Label>
-          <Textarea
-            id="statement"
-            value={statement}
-            readOnly
-            className="h-24 bg-gray-50"
-          />
-          <p className="text-sm text-gray-500">Statement is automatically generated based on rule type and inputs.</p>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="description">Rule Description</Label>
-          <Textarea
-            id="description"
-            placeholder="Rule-specific attributes and description"
-            value={ruleDescription}
-            onChange={(e) => setRuleDescription(e.target.value)}
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="regex">Regex (optional)</Label>
-          <Input
-            id="regex"
-            placeholder="e.g., (Test1234)"
-            value={regex}
-            onChange={(e) => setRegex(e.target.value)}
-          />
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="valid-from">Valid From</Label>
-            <Input
-              id="valid-from"
-              type="date"
-              value={validFrom}
-              onChange={(e) => setValidFrom(e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="valid-till">Valid Till</Label>
-            <Input
-              id="valid-till"
-              type="date"
-              value={validTill}
-              onChange={(e) => setValidTill(e.target.value)}
-            />
+          <div id="statement" className="p-3 bg-gray-50 rounded-md min-h-[50px]">
+            {statement || <span className="text-gray-400">Rule statement will appear here</span>}
           </div>
         </div>
       </CardContent>
       <CardFooter className="justify-between">
-        <Button variant="outline" onClick={onCancel}>Cancel</Button>
+        <Button variant="outline" onClick={onCancel}>
+          <X className="mr-2 h-4 w-4" />
+          Cancel
+        </Button>
         <Button onClick={handleSave}>
           <Check className="mr-2 h-4 w-4" />
           {isEditing ? 'Update Rule' : 'Create Rule'}

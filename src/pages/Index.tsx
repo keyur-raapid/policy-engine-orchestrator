@@ -7,9 +7,10 @@ import ClientSelector from '@/components/ClientSelector';
 import RuleTypeSelector from '@/components/RuleTypeSelector';
 import RulesList from '@/components/RulesList';
 import RuleForm from '@/components/RuleForm';
+import RuleTypeManager from '@/components/RuleTypeManager';
 import { mockClients, mockRuleTypes, fetchRules } from '@/data/mockData';
 import { Client, Rule, RuleType } from '@/lib/types';
-import { Plus } from 'lucide-react';
+import { Plus, Settings } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 const Index = () => {
@@ -17,9 +18,11 @@ const Index = () => {
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [selectedRuleType, setSelectedRuleType] = useState<RuleType | null>(null);
   const [rules, setRules] = useState<Rule[]>([]);
+  const [ruleTypes, setRuleTypes] = useState<RuleType[]>(mockRuleTypes);
   const [isCreatingRule, setIsCreatingRule] = useState(false);
   const [editingRule, setEditingRule] = useState<Rule | null>(null);
   const [activeTab, setActiveTab] = useState('rules');
+  const [showRuleTypeManager, setShowRuleTypeManager] = useState(false);
   
   useEffect(() => {
     if (selectedClient) {
@@ -37,6 +40,7 @@ const Index = () => {
     setSelectedClient(client);
     setEditingRule(null);
     setIsCreatingRule(false);
+    setShowRuleTypeManager(false);
   };
 
   const handleSelectRuleType = (ruleType: RuleType | null) => {
@@ -49,28 +53,26 @@ const Index = () => {
     setIsCreatingRule(true);
     setEditingRule(null);
     setActiveTab('form');
+    setShowRuleTypeManager(false);
   };
 
   const handleEditRule = (rule: Rule) => {
     setEditingRule(rule);
     setIsCreatingRule(false);
     setActiveTab('form');
+    setShowRuleTypeManager(false);
   };
 
   const handleDeleteRule = (rule: Rule) => {
-    // In a real application, this would make an API call
     toast({
       title: "Rule Deleted",
       description: `Rule ${rule.rule_id} has been deleted.`,
     });
     
-    // Remove the rule from the UI
     setRules(rules.filter(r => r.rule_id !== rule.rule_id));
   };
 
   const handleSaveRule = (rule: Partial<Rule>) => {
-    // In a real application, this would make an API call
-    
     if (editingRule) {
       // Update existing rule
       const updatedRules = rules.map(r => 
@@ -109,6 +111,26 @@ const Index = () => {
     setActiveTab('rules');
   };
 
+  const handleAddRuleType = (newRuleType: Omit<RuleType, 'ruletype_id'>) => {
+    const nextId = Math.max(...ruleTypes.map(rt => rt.ruletype_id)) + 1;
+    const ruleType = {
+      ...newRuleType,
+      ruletype_id: nextId
+    };
+    setRuleTypes([...ruleTypes, ruleType]);
+  };
+
+  const handleToggleRuleTypeManager = () => {
+    setShowRuleTypeManager(!showRuleTypeManager);
+    if (!showRuleTypeManager) {
+      setIsCreatingRule(false);
+      setEditingRule(null);
+      setActiveTab('settings');
+    } else {
+      setActiveTab('rules');
+    }
+  };
+
   return (
     <div className="container mx-auto py-8 max-w-6xl">
       <div className="mb-8">
@@ -124,19 +146,26 @@ const Index = () => {
         />
         
         <RuleTypeSelector
-          ruleTypes={mockRuleTypes}
+          ruleTypes={ruleTypes}
           selectedRuleType={selectedRuleType}
           onSelectRuleType={handleSelectRuleType}
         />
         
-        <div className="flex items-end">
+        <div className="flex items-end gap-2">
           <Button 
             onClick={handleCreateRule}
             disabled={!selectedClient}
-            className="w-full"
+            className="flex-1"
           >
             <Plus className="mr-2 h-4 w-4" /> 
-            Create New Rule
+            Create Rule
+          </Button>
+          <Button 
+            variant="outline"
+            onClick={handleToggleRuleTypeManager}
+            className="flex-shrink-0"
+          >
+            <Settings className="h-4 w-4" />
           </Button>
         </div>
       </div>
@@ -148,6 +177,11 @@ const Index = () => {
             {(isCreatingRule || editingRule) && (
               <TabsTrigger value="form" className="flex-1">
                 {isCreatingRule ? 'Create Rule' : 'Edit Rule'}
+              </TabsTrigger>
+            )}
+            {showRuleTypeManager && (
+              <TabsTrigger value="settings" className="flex-1">
+                Manage Rule Types
               </TabsTrigger>
             )}
           </TabsList>
@@ -178,9 +212,18 @@ const Index = () => {
               <RuleForm
                 rule={editingRule || undefined}
                 client={selectedClient}
-                ruleTypes={mockRuleTypes}
+                ruleTypes={ruleTypes}
                 onSave={handleSaveRule}
                 onCancel={handleCancelRuleForm}
+              />
+            )}
+          </TabsContent>
+          
+          <TabsContent value="settings">
+            {showRuleTypeManager && (
+              <RuleTypeManager
+                ruleTypes={ruleTypes}
+                onAddRuleType={handleAddRuleType}
               />
             )}
           </TabsContent>

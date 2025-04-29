@@ -8,6 +8,14 @@ export interface Client {
 export interface RuleType {
   ruletype_id: number;
   name: string;
+  customFields?: CustomField[];
+}
+
+export interface CustomField {
+  key: string;
+  label: string;
+  type: 'string' | 'icdCode';
+  required?: boolean;
 }
 
 export interface RuleInput {
@@ -21,10 +29,10 @@ export interface Rule {
   ruletype_id: number;
   inputs: RuleInput;
   statement: string;
-  rule_description: string;
+  rule_description?: string;
   regex?: string;
-  valid_from: string;
-  valid_till: string;
+  valid_from?: string;
+  valid_till?: string;
   version: number;
   created_at?: string;
   updated_at?: string;
