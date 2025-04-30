@@ -157,12 +157,17 @@ const Index = () => {
     }
   };
 
-  const handleMassAdd = (ruleId: string, values: Record<string, string>[]) => {
+  const handleMassAdd = (ruleTypeId: number, values: Record<string, string>[]) => {
     // This would be where you would normally send the data to an API
     // For this example, we'll just show a success message
+    
+    // Find the rule type name for the success message
+    const ruleType = ruleTypes.find(rt => rt.ruletype_id === ruleTypeId);
+    
     toast({
       title: "Mass Entry Successful",
-      description: `Added ${values.length} entries to the selected rule with ${Object.keys(values[0] || {}).length} columns.`,
+      description: `Added ${values.length} entries to ${ruleType?.name || 'selected rule type'} with ${Object.keys(values[0] || {}).length} columns.`,
+      variant: "default"
     });
   };
 

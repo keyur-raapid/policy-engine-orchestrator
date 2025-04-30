@@ -1,23 +1,23 @@
+
 import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Rule, RuleType } from '../lib/types';
-import { Upload, File, Check, Plus, X } from 'lucide-react';
+import { Upload, Check, Plus, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 
 interface MassEntryUploadProps {
   rules: Rule[];
   ruleTypes: RuleType[];
-  onMassAdd: (ruleId: string, values: Record<string, string>[]) => void;
+  onMassAdd: (ruleTypeId: number, values: Record<string, string>[]) => void;
 }
 
 const MassEntryUpload = ({ rules, ruleTypes, onMassAdd }: MassEntryUploadProps) => {
   const { toast } = useToast();
-  const [selectedRuleId, setSelectedRuleId] = useState<string>('');
-  const [selectedRuleTypeId, setSelectedRuleTypeId] = useState<string>('all'); // Changed from empty string to 'all'
+  const [selectedRuleTypeId, setSelectedRuleTypeId] = useState<string>('all');
   const [file, setFile] = useState<File | null>(null);
   const [selectedColumns, setSelectedColumns] = useState<string[]>([]);
   const [availableColumns, setAvailableColumns] = useState<string[]>([]);
@@ -25,14 +25,8 @@ const MassEntryUpload = ({ rules, ruleTypes, onMassAdd }: MassEntryUploadProps) 
   const [parsedValues, setParsedValues] = useState<Record<string, string>[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const selectedRule = rules.find(rule => rule.rule_id === selectedRuleId);
-  const selectedRuleType = ruleTypes.find(rt => rt.ruletype_id.toString() === selectedRuleTypeId);
   
-  // Filter rules by selected rule type
-  const filteredRules = selectedRuleTypeId === 'all'
-    ? rules
-    : rules.filter(rule => rule.ruletype_id.toString() === selectedRuleTypeId);
+  const selectedRuleType = ruleTypes.find(rt => rt.ruletype_id.toString() === selectedRuleTypeId);
   
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -140,7 +134,10 @@ const MassEntryUpload = ({ rules, ruleTypes, onMassAdd }: MassEntryUploadProps) 
   };
 
   const handleSubmit = () => {
-    if (parsedValues.length > 0 && selectedRuleId && selectedColumns.length > 0) {
+    if (parsedValues.length > 0 && selectedRuleTypeId !== 'all' && selectedColumns.length > 0) {
+      // Convert selectedRuleTypeId to a number
+      const ruleTypeId = parseInt(selectedRuleTypeId);
+      
       // Only include selected columns in the data
       const filteredData = parsedValues.map(row => {
         const filteredRow: Record<string, string> = {};
@@ -152,7 +149,7 @@ const MassEntryUpload = ({ rules, ruleTypes, onMassAdd }: MassEntryUploadProps) 
         return filteredRow;
       });
       
-      onMassAdd(selectedRuleId, filteredData);
+      onMassAdd(ruleTypeId, filteredData);
       
       // Reset form after submission
       setFile(null);
@@ -161,10 +158,10 @@ const MassEntryUpload = ({ rules, ruleTypes, onMassAdd }: MassEntryUploadProps) 
       setAvailableColumns([]);
       if (fileInputRef.current) fileInputRef.current.value = '';
     } else {
-      if (!selectedRuleId) {
+      if (selectedRuleTypeId === 'all') {
         toast({
-          title: "No Rule Selected",
-          description: "Please select a rule for mass entry",
+          title: "No Rule Type Selected",
+          description: "Please select a rule type for mass entry",
           variant: "destructive"
         });
       } else if (selectedColumns.length === 0) {
@@ -189,40 +186,16 @@ const MassEntryUpload = ({ rules, ruleTypes, onMassAdd }: MassEntryUploadProps) 
           </label>
           <Select
             value={selectedRuleTypeId}
-            onValueChange={(value) => {
-              setSelectedRuleTypeId(value);
-              setSelectedRuleId('');
-            }}
+            onValueChange={setSelectedRuleTypeId}
           >
             <SelectTrigger>
               <SelectValue placeholder="Select a rule type" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Rule Types</SelectItem> {/* Changed from empty string to "all" */}
+              <SelectItem value="all">All Rule Types</SelectItem>
               {ruleTypes.map((ruleType) => (
                 <SelectItem key={ruleType.ruletype_id} value={ruleType.ruletype_id.toString()}>
                   {ruleType.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        
-        <div className="space-y-2">
-          <label htmlFor="rule-select" className="text-sm font-medium">
-            Select Rule
-          </label>
-          <Select
-            value={selectedRuleId}
-            onValueChange={setSelectedRuleId}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select a rule" />
-            </SelectTrigger>
-            <SelectContent>
-              {filteredRules.map(rule => (
-                <SelectItem key={rule.rule_id} value={rule.rule_id}>
-                  {Object.values(rule.inputs).join(' - ')}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -342,11 +315,11 @@ const MassEntryUpload = ({ rules, ruleTypes, onMassAdd }: MassEntryUploadProps) 
       <CardFooter>
         <Button 
           onClick={handleSubmit} 
-          disabled={parsedValues.length === 0 || !selectedRuleId || selectedColumns.length === 0}
+          disabled={parsedValues.length === 0 || selectedRuleTypeId === 'all' || selectedColumns.length === 0}
           className="w-full"
         >
           <Check className="h-4 w-4 mr-2" />
-          Add {parsedValues.length} Entries to Rule
+          Add {parsedValues.length} Entries to Rule Type
         </Button>
       </CardFooter>
     </Card>
