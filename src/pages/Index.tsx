@@ -163,7 +163,6 @@ const Index = () => {
     toast({
       title: "Mass Entry Successful",
       description: `Added ${values.length} entries to the selected rule with ${Object.keys(values[0] || {}).length} columns.`,
-      variant: "success"
     });
   };
 

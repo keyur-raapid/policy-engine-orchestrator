@@ -1,4 +1,3 @@
-
 import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -114,7 +113,7 @@ const MassEntryUpload = ({ rules, ruleTypes, onMassAdd }: MassEntryUploadProps) 
       toast({
         title: "File Parsed Successfully",
         description: `Found ${parsedData.length} rows with ${headers.length} columns`,
-        variant: "success"
+        variant: "default"
       });
     } catch (error) {
       toast({
