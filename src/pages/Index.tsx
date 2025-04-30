@@ -8,9 +8,10 @@ import RuleTypeSelector from '@/components/RuleTypeSelector';
 import RulesList from '@/components/RulesList';
 import RuleForm from '@/components/RuleForm';
 import RuleTypeManager from '@/components/RuleTypeManager';
+import MassEntryUpload from '@/components/MassEntryUpload';
 import { mockClients, mockRuleTypes, fetchRules } from '@/data/mockData';
 import { Client, Rule, RuleType } from '@/lib/types';
-import { Plus, Settings } from 'lucide-react';
+import { Plus, Settings, File } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 const Index = () => {
@@ -23,6 +24,7 @@ const Index = () => {
   const [editingRule, setEditingRule] = useState<Rule | null>(null);
   const [activeTab, setActiveTab] = useState('rules');
   const [showRuleTypeManager, setShowRuleTypeManager] = useState(false);
+  const [showMassEntry, setShowMassEntry] = useState(false);
   
   useEffect(() => {
     if (selectedClient) {
@@ -41,6 +43,7 @@ const Index = () => {
     setEditingRule(null);
     setIsCreatingRule(false);
     setShowRuleTypeManager(false);
+    setShowMassEntry(false);
   };
 
   const handleSelectRuleType = (ruleType: RuleType | null) => {
@@ -54,6 +57,7 @@ const Index = () => {
     setEditingRule(null);
     setActiveTab('form');
     setShowRuleTypeManager(false);
+    setShowMassEntry(false);
   };
 
   const handleEditRule = (rule: Rule) => {
@@ -61,6 +65,7 @@ const Index = () => {
     setIsCreatingRule(false);
     setActiveTab('form');
     setShowRuleTypeManager(false);
+    setShowMassEntry(false);
   };
 
   const handleDeleteRule = (rule: Rule) => {
@@ -131,6 +136,7 @@ const Index = () => {
 
   const handleToggleRuleTypeManager = () => {
     setShowRuleTypeManager(!showRuleTypeManager);
+    setShowMassEntry(false);
     if (!showRuleTypeManager) {
       setIsCreatingRule(false);
       setEditingRule(null);
@@ -138,6 +144,27 @@ const Index = () => {
     } else {
       setActiveTab('rules');
     }
+  };
+
+  const handleToggleMassEntry = () => {
+    setShowMassEntry(!showMassEntry);
+    setShowRuleTypeManager(false);
+    if (!showMassEntry) {
+      setIsCreatingRule(false);
+      setEditingRule(null);
+      setActiveTab('mass-entry');
+    } else {
+      setActiveTab('rules');
+    }
+  };
+
+  const handleMassAdd = (ruleId: string, values: string[]) => {
+    // This would be where you would normally send the data to an API
+    // For this example, we'll just show a success message
+    toast({
+      title: "Mass Entry Successful",
+      description: `Added ${values.length} entries to the selected rule.`,
+    });
   };
 
   return (
@@ -171,6 +198,14 @@ const Index = () => {
           </Button>
           <Button 
             variant="outline"
+            onClick={handleToggleMassEntry}
+            disabled={!selectedClient}
+            className="flex-shrink-0"
+          >
+            <File className="h-4 w-4" />
+          </Button>
+          <Button 
+            variant="outline"
             onClick={handleToggleRuleTypeManager}
             className="flex-shrink-0"
           >
@@ -186,6 +221,11 @@ const Index = () => {
             {(isCreatingRule || editingRule) && (
               <TabsTrigger value="form" className="flex-1">
                 {isCreatingRule ? 'Create Rule' : 'Edit Rule'}
+              </TabsTrigger>
+            )}
+            {showMassEntry && (
+              <TabsTrigger value="mass-entry" className="flex-1">
+                Mass Entry Upload
               </TabsTrigger>
             )}
             {showRuleTypeManager && (
@@ -224,6 +264,16 @@ const Index = () => {
                 ruleTypes={ruleTypes}
                 onSave={handleSaveRule}
                 onCancel={handleCancelRuleForm}
+              />
+            )}
+          </TabsContent>
+          
+          <TabsContent value="mass-entry">
+            {showMassEntry && (
+              <MassEntryUpload
+                rules={rules}
+                ruleTypes={ruleTypes}
+                onMassAdd={handleMassAdd}
               />
             )}
           </TabsContent>
