@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -158,12 +157,13 @@ const Index = () => {
     }
   };
 
-  const handleMassAdd = (ruleId: string, values: string[]) => {
+  const handleMassAdd = (ruleId: string, values: Record<string, string>[]) => {
     // This would be where you would normally send the data to an API
     // For this example, we'll just show a success message
     toast({
       title: "Mass Entry Successful",
-      description: `Added ${values.length} entries to the selected rule.`,
+      description: `Added ${values.length} entries to the selected rule with ${Object.keys(values[0] || {}).length} columns.`,
+      variant: "success"
     });
   };
 
