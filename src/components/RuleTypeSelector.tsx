@@ -14,7 +14,7 @@ const RuleTypeSelector = ({ ruleTypes, selectedRuleType, onSelectRuleType }: Rul
     <div className="space-y-2">
       <Label htmlFor="ruletype-select">Rule Type</Label>
       <Select
-        value={selectedRuleType ? selectedRuleType.ruletype_id.toString() : ''}
+        value={selectedRuleType ? selectedRuleType.ruletype_id.toString() : 'all'} // Changed from empty string to 'all'
         onValueChange={(value) => {
           if (value === 'all') {
             onSelectRuleType(null);
@@ -30,7 +30,7 @@ const RuleTypeSelector = ({ ruleTypes, selectedRuleType, onSelectRuleType }: Rul
           <SelectValue placeholder="Select a rule type" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">All Rule Types</SelectItem>
+          <SelectItem value="all">All Rule Types</SelectItem> {/* Value was already non-empty */}
           {ruleTypes.map((ruleType) => (
             <SelectItem key={ruleType.ruletype_id} value={ruleType.ruletype_id.toString()}>
               {ruleType.name}

@@ -17,7 +17,7 @@ interface MassEntryUploadProps {
 const MassEntryUpload = ({ rules, ruleTypes, onMassAdd }: MassEntryUploadProps) => {
   const { toast } = useToast();
   const [selectedRuleId, setSelectedRuleId] = useState<string>('');
-  const [selectedRuleTypeId, setSelectedRuleTypeId] = useState<string>('');
+  const [selectedRuleTypeId, setSelectedRuleTypeId] = useState<string>('all'); // Changed from empty string to 'all'
   const [file, setFile] = useState<File | null>(null);
   const [selectedColumns, setSelectedColumns] = useState<string[]>([]);
   const [availableColumns, setAvailableColumns] = useState<string[]>([]);
@@ -30,9 +30,9 @@ const MassEntryUpload = ({ rules, ruleTypes, onMassAdd }: MassEntryUploadProps) 
   const selectedRuleType = ruleTypes.find(rt => rt.ruletype_id.toString() === selectedRuleTypeId);
   
   // Filter rules by selected rule type
-  const filteredRules = selectedRuleTypeId 
-    ? rules.filter(rule => rule.ruletype_id.toString() === selectedRuleTypeId)
-    : rules;
+  const filteredRules = selectedRuleTypeId === 'all'
+    ? rules
+    : rules.filter(rule => rule.ruletype_id.toString() === selectedRuleTypeId);
   
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -198,7 +198,7 @@ const MassEntryUpload = ({ rules, ruleTypes, onMassAdd }: MassEntryUploadProps) 
               <SelectValue placeholder="Select a rule type" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All Rule Types</SelectItem>
+              <SelectItem value="all">All Rule Types</SelectItem> {/* Changed from empty string to "all" */}
               {ruleTypes.map((ruleType) => (
                 <SelectItem key={ruleType.ruletype_id} value={ruleType.ruletype_id.toString()}>
                   {ruleType.name}
