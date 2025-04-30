@@ -159,16 +159,44 @@ const Index = () => {
 
   const handleMassAdd = (ruleTypeId: number, values: Record<string, string>[]) => {
     // This would be where you would normally send the data to an API
-    // For this example, we'll just show a success message
+    if (!values || values.length === 0) {
+      toast({
+        title: "No Data",
+        description: "No data to add",
+        variant: "destructive"
+      });
+      return;
+    }
     
     // Find the rule type name for the success message
     const ruleType = ruleTypes.find(rt => rt.ruletype_id === ruleTypeId);
     
+    // Generate new rules based on the imported data
+    const newRules = values.map(value => {
+      return {
+        rule_id: `r${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        project_id: selectedClient?.project_id || 0,
+        category_id: 1, // Default category
+        ruletype_id: ruleTypeId,
+        inputs: value,
+        version: 1,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      } as Rule;
+    });
+    
+    // Add the new rules to the rules array
+    setRules([...rules, ...newRules]);
+    
     toast({
       title: "Mass Entry Successful",
-      description: `Added ${values.length} entries to ${ruleType?.name || 'selected rule type'} with ${Object.keys(values[0] || {}).length} columns.`,
+      description: `Added ${values.length} entries to ${ruleType?.name || 'selected rule type'}`,
       variant: "default"
     });
+    
+    // Switch back to rules view to show the new rules
+    setActiveTab('rules');
+    setShowMassEntry(false);
   };
 
   return (

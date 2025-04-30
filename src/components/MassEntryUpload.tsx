@@ -17,7 +17,7 @@ interface MassEntryUploadProps {
 
 const MassEntryUpload = ({ rules, ruleTypes, onMassAdd }: MassEntryUploadProps) => {
   const { toast } = useToast();
-  const [selectedRuleTypeId, setSelectedRuleTypeId] = useState<string>('all');
+  const [selectedRuleTypeId, setSelectedRuleTypeId] = useState<string>(ruleTypes.length > 0 ? ruleTypes[0].ruletype_id.toString() : '');
   const [file, setFile] = useState<File | null>(null);
   const [selectedColumns, setSelectedColumns] = useState<string[]>([]);
   const [availableColumns, setAvailableColumns] = useState<string[]>([]);
@@ -35,6 +35,9 @@ const MassEntryUpload = ({ rules, ruleTypes, onMassAdd }: MassEntryUploadProps) 
       setParsedValues([]);
       setAvailableColumns([]);
       setSelectedColumns([]);
+      
+      // Auto-parse the file on selection
+      parseFile(selectedFile);
     }
   };
 
@@ -60,8 +63,10 @@ const MassEntryUpload = ({ rules, ruleTypes, onMassAdd }: MassEntryUploadProps) 
     return { delimiter, headers };
   };
 
-  const parseFile = async () => {
-    if (!file) {
+  const parseFile = async (fileToProcess?: File) => {
+    const fileToUse = fileToProcess || file;
+    
+    if (!fileToUse) {
       toast({
         title: "No file selected",
         description: "Please select a file to upload",
@@ -73,13 +78,17 @@ const MassEntryUpload = ({ rules, ruleTypes, onMassAdd }: MassEntryUploadProps) 
     setIsProcessing(true);
     
     try {
-      const text = await file.text();
+      const text = await fileToUse.text();
       
       // Detect delimiter and headers
       const { delimiter, headers } = detectDelimiterAndHeaders(text);
       
       // Set available columns from headers
-      setAvailableColumns(headers.filter(h => h !== ''));
+      const validHeaders = headers.filter(h => h !== '');
+      setAvailableColumns(validHeaders);
+      
+      // Auto-select all available columns
+      setSelectedColumns(validHeaders);
       
       // Parse data rows
       const lines = text.split('\n');
@@ -106,7 +115,7 @@ const MassEntryUpload = ({ rules, ruleTypes, onMassAdd }: MassEntryUploadProps) 
       
       toast({
         title: "File Parsed Successfully",
-        description: `Found ${parsedData.length} rows with ${headers.length} columns`,
+        description: `Found ${parsedData.length} rows with ${validHeaders.length} columns`,
         variant: "default"
       });
     } catch (error) {
@@ -133,8 +142,12 @@ const MassEntryUpload = ({ rules, ruleTypes, onMassAdd }: MassEntryUploadProps) 
     setSelectedColumns(selectedColumns.filter(c => c !== column));
   };
 
-  const handleSubmit = () => {
-    if (parsedValues.length > 0 && selectedRuleTypeId !== 'all' && selectedColumns.length > 0) {
+  const handleSubmit = (e?: React.FormEvent) => {
+    if (e) {
+      e.preventDefault();
+    }
+    
+    if (parsedValues.length > 0 && selectedRuleTypeId && selectedColumns.length > 0) {
       // Convert selectedRuleTypeId to a number
       const ruleTypeId = parseInt(selectedRuleTypeId);
       
@@ -142,7 +155,7 @@ const MassEntryUpload = ({ rules, ruleTypes, onMassAdd }: MassEntryUploadProps) 
       const filteredData = parsedValues.map(row => {
         const filteredRow: Record<string, string> = {};
         selectedColumns.forEach(col => {
-          if (row[col]) {
+          if (col in row) {
             filteredRow[col] = row[col];
           }
         });
@@ -151,6 +164,12 @@ const MassEntryUpload = ({ rules, ruleTypes, onMassAdd }: MassEntryUploadProps) 
       
       onMassAdd(ruleTypeId, filteredData);
       
+      toast({
+        title: "Success",
+        description: `Added ${filteredData.length} entries to selected rule type`,
+        variant: "default" 
+      });
+      
       // Reset form after submission
       setFile(null);
       setParsedValues([]);
@@ -158,7 +177,7 @@ const MassEntryUpload = ({ rules, ruleTypes, onMassAdd }: MassEntryUploadProps) 
       setAvailableColumns([]);
       if (fileInputRef.current) fileInputRef.current.value = '';
     } else {
-      if (selectedRuleTypeId === 'all') {
+      if (!selectedRuleTypeId) {
         toast({
           title: "No Rule Type Selected",
           description: "Please select a rule type for mass entry",
@@ -168,6 +187,12 @@ const MassEntryUpload = ({ rules, ruleTypes, onMassAdd }: MassEntryUploadProps) 
         toast({
           title: "No Columns Selected",
           description: "Please select at least one column to import",
+          variant: "destructive"
+        });
+      } else if (parsedValues.length === 0) {
+        toast({
+          title: "No Data Available",
+          description: "Please upload and parse a file first",
           variant: "destructive"
         });
       }
@@ -180,148 +205,155 @@ const MassEntryUpload = ({ rules, ruleTypes, onMassAdd }: MassEntryUploadProps) 
         <CardTitle>Mass Entry Upload</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <label htmlFor="ruletype-select" className="text-sm font-medium">
-            Select Rule Type
-          </label>
-          <Select
-            value={selectedRuleTypeId}
-            onValueChange={setSelectedRuleTypeId}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select a rule type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Rule Types</SelectItem>
-              {ruleTypes.map((ruleType) => (
-                <SelectItem key={ruleType.ruletype_id} value={ruleType.ruletype_id.toString()}>
-                  {ruleType.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="space-y-2">
-          <label htmlFor="file-upload" className="text-sm font-medium">
-            Upload File (CSV, TSV, or Text)
-          </label>
-          <div className="flex items-center gap-2">
-            <Input
-              ref={fileInputRef}
-              id="file-upload"
-              type="file"
-              onChange={handleFileChange}
-              accept=".csv,.tsv,.txt,text/plain,text/csv"
-              className="flex-1"
-            />
-            <Button 
-              onClick={parseFile} 
-              disabled={!file || isProcessing}
-              variant="outline"
-            >
-              <Upload className="h-4 w-4 mr-2" />
-              Parse
-            </Button>
-          </div>
-        </div>
-
-        {availableColumns.length > 0 && (
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <label className="text-sm font-medium">
-              Select Columns to Import
+            <label htmlFor="ruletype-select" className="text-sm font-medium">
+              Select Rule Type
             </label>
-            <div className="flex items-center gap-2 mb-2">
-              <Select
-                value={newColumn}
-                onValueChange={setNewColumn}
-              >
-                <SelectTrigger className="flex-1">
-                  <SelectValue placeholder="Select a column" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableColumns
-                    .filter(col => !selectedColumns.includes(col))
-                    .map((column) => (
-                      <SelectItem key={column} value={column}>
-                        {column}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
+            <Select
+              value={selectedRuleTypeId}
+              onValueChange={setSelectedRuleTypeId}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select a rule type" />
+              </SelectTrigger>
+              <SelectContent>
+                {ruleTypes.map((ruleType) => (
+                  <SelectItem key={ruleType.ruletype_id} value={ruleType.ruletype_id.toString()}>
+                    {ruleType.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="file-upload" className="text-sm font-medium">
+              Upload File (CSV, TSV, or Text)
+            </label>
+            <div className="flex items-center gap-2">
+              <Input
+                ref={fileInputRef}
+                id="file-upload"
+                type="file"
+                onChange={handleFileChange}
+                accept=".csv,.tsv,.txt,text/plain,text/csv"
+                className="flex-1"
+              />
               <Button 
-                onClick={handleAddColumn} 
-                disabled={!newColumn}
+                type="button"
+                onClick={() => parseFile()}
+                disabled={!file || isProcessing}
                 variant="outline"
-                size="icon"
               >
-                <Plus className="h-4 w-4" />
+                <Upload className="h-4 w-4 mr-2" />
+                Parse
               </Button>
             </div>
-
-            <div className="flex flex-wrap gap-2 mt-2">
-              {selectedColumns.map(column => (
-                <Badge key={column} variant="secondary" className="flex items-center gap-1">
-                  {column}
-                  <button 
-                    onClick={() => handleRemoveColumn(column)} 
-                    className="text-gray-500 hover:text-gray-700 ml-1"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              ))}
-            </div>
+            <p className="text-xs text-gray-500">
+              Supports files with or without extensions. The first row should contain column headers.
+            </p>
           </div>
-        )}
 
-        {parsedValues.length > 0 && (
-          <div className="space-y-2 mt-4">
-            <h3 className="text-sm font-medium">Preview ({parsedValues.length} rows)</h3>
-            <div className="max-h-40 overflow-y-auto border rounded p-2 bg-gray-50">
-              <table className="min-w-full text-sm">
-                <thead>
-                  <tr>
-                    {selectedColumns.map(col => (
-                      <th key={col} className="px-2 py-1 text-left font-medium">
-                        {col}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {parsedValues.slice(0, 5).map((row, rowIndex) => (
-                    <tr key={rowIndex}>
+          {availableColumns.length > 0 && (
+            <div className="space-y-2">
+              <label className="text-sm font-medium">
+                Select Columns to Import
+              </label>
+              <div className="flex items-center gap-2 mb-2">
+                <Select
+                  value={newColumn}
+                  onValueChange={setNewColumn}
+                  disabled={availableColumns.length === selectedColumns.length}
+                >
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Select a column" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableColumns
+                      .filter(col => !selectedColumns.includes(col))
+                      .map((column) => (
+                        <SelectItem key={column} value={column}>
+                          {column}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+                <Button 
+                  type="button"
+                  onClick={handleAddColumn} 
+                  disabled={!newColumn || availableColumns.length === selectedColumns.length}
+                  variant="outline"
+                  size="icon"
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+
+              <div className="flex flex-wrap gap-2 mt-2">
+                {selectedColumns.map(column => (
+                  <Badge key={column} variant="secondary" className="flex items-center gap-1">
+                    {column}
+                    <button 
+                      type="button"
+                      onClick={() => handleRemoveColumn(column)} 
+                      className="text-gray-500 hover:text-gray-700 ml-1"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {parsedValues.length > 0 && (
+            <div className="space-y-2 mt-4">
+              <h3 className="text-sm font-medium">Preview ({parsedValues.length} rows)</h3>
+              <div className="max-h-40 overflow-y-auto border rounded p-2 bg-gray-50">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr>
                       {selectedColumns.map(col => (
-                        <td key={`${rowIndex}-${col}`} className="px-2 py-1 border-t">
-                          {row[col] || ''}
-                        </td>
+                        <th key={col} className="px-2 py-1 text-left font-medium">
+                          {col}
+                        </th>
                       ))}
                     </tr>
-                  ))}
-                  {parsedValues.length > 5 && (
-                    <tr>
-                      <td colSpan={selectedColumns.length} className="px-2 py-1 text-gray-500 border-t">
-                        ... and {parsedValues.length - 5} more rows
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {parsedValues.slice(0, 5).map((row, rowIndex) => (
+                      <tr key={rowIndex}>
+                        {selectedColumns.map(col => (
+                          <td key={`${rowIndex}-${col}`} className="px-2 py-1 border-t">
+                            {col in row ? row[col] : ''}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                    {parsedValues.length > 5 && (
+                      <tr>
+                        <td colSpan={selectedColumns.length} className="px-2 py-1 text-gray-500 border-t">
+                          ... and {parsedValues.length - 5} more rows
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
-        )}
+          )}
+
+          <Button 
+            type="submit"
+            disabled={parsedValues.length === 0 || !selectedRuleTypeId || selectedColumns.length === 0}
+            className="w-full"
+          >
+            <Check className="h-4 w-4 mr-2" />
+            Add {parsedValues.length} Entries to Rule Type
+          </Button>
+        </form>
       </CardContent>
-      <CardFooter>
-        <Button 
-          onClick={handleSubmit} 
-          disabled={parsedValues.length === 0 || selectedRuleTypeId === 'all' || selectedColumns.length === 0}
-          className="w-full"
-        >
-          <Check className="h-4 w-4 mr-2" />
-          Add {parsedValues.length} Entries to Rule Type
-        </Button>
-      </CardFooter>
     </Card>
   );
 };
