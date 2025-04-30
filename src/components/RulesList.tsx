@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Rule, RuleType } from '../lib/types';
 import RuleCard from './RuleCard';
 import { Input } from '@/components/ui/input';
@@ -16,12 +16,26 @@ const RulesList = ({ rules, onEditRule, onDeleteRule }: RulesListProps) => {
   const [selectedRule, setSelectedRule] = useState<Rule | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
+  // Reset selected rule when rules array changes (e.g., after deletion)
+  useEffect(() => {
+    if (selectedRule && !rules.some(rule => rule.rule_id === selectedRule.rule_id)) {
+      setSelectedRule(null);
+    }
+  }, [rules, selectedRule]);
+
   const filteredRules = rules.filter(rule => {
     const searchLower = searchTerm.toLowerCase();
     return Object.values(rule.inputs).some(value => 
       value.toString().toLowerCase().includes(searchLower)
     );
   });
+
+  const handleDeleteRule = (rule: Rule) => {
+    onDeleteRule(rule);
+    if (selectedRule && selectedRule.rule_id === rule.rule_id) {
+      setSelectedRule(null);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -71,7 +85,7 @@ const RulesList = ({ rules, onEditRule, onDeleteRule }: RulesListProps) => {
             <RuleCard
               rule={selectedRule}
               onEdit={onEditRule}
-              onDelete={onDeleteRule}
+              onDelete={handleDeleteRule}
             />
           </div>
         )}
