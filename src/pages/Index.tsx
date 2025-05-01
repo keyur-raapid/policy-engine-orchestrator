@@ -25,6 +25,12 @@ const Index = () => {
   const [showRuleTypeManager, setShowRuleTypeManager] = useState(false);
   const [showMassEntry, setShowMassEntry] = useState(false);
   
+  // Log state changes for debugging
+  useEffect(() => {
+    console.log("Active Tab:", activeTab);
+    console.log("Is Creating Rule:", isCreatingRule);
+  }, [activeTab, isCreatingRule]);
+  
   useEffect(() => {
     if (selectedClient) {
       const fetchedRules = fetchRules(
@@ -57,6 +63,9 @@ const Index = () => {
     setActiveTab('form');
     setShowRuleTypeManager(false);
     setShowMassEntry(false);
+    
+    // Add this line for debugging
+    console.log("Create Rule button clicked, setting activeTab to 'form'");
   };
 
   const handleEditRule = (rule: Rule) => {
@@ -289,12 +298,12 @@ const Index = () => {
           </TabsContent>
           
           <TabsContent value="form">
-            {selectedClient && (isCreatingRule || editingRule) && (
+            {selectedClient && (
               <RuleForm
                 rule={editingRule || undefined}
                 client={selectedClient}
                 ruleTypes={ruleTypes}
-                rules={rules} // Pass the rules array to check for duplicates
+                rules={rules}
                 onSave={handleSaveRule}
                 onCancel={handleCancelRuleForm}
               />
