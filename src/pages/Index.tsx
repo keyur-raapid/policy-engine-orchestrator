@@ -294,6 +294,7 @@ const Index = () => {
                 rule={editingRule || undefined}
                 client={selectedClient}
                 ruleTypes={ruleTypes}
+                rules={rules} // Pass the rules array to check for duplicates
                 onSave={handleSaveRule}
                 onCancel={handleCancelRuleForm}
               />

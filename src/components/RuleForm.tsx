@@ -1,11 +1,10 @@
-
 import { useState, useEffect } from 'react';
 import { Rule, RuleType, Client } from '../lib/types';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Check, X } from 'lucide-react';
+import { Check, X, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import ICDCodeInput from './ICDCodeInput';
 import { 
@@ -14,18 +13,21 @@ import {
   InputFieldConfig,
   getValidationRulesForRuleType
 } from '../utils/ruleUtils';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { checkDuplicateRule } from '../utils/ruleValidation';
 
 interface RuleFormProps {
   rule?: Rule;
   client: Client;
   ruleTypes: RuleType[];
+  rules: Rule[]; // Add existing rules prop
   onSave: (rule: Partial<Rule>) => void;
   onCancel: () => void;
 }
 
 const CATEGORY_ID = 71; // Default category ID as per PRD
 
-const RuleForm = ({ rule, client, ruleTypes, onSave, onCancel }: RuleFormProps) => {
+const RuleForm = ({ rule, client, ruleTypes, rules, onSave, onCancel }: RuleFormProps) => {
   const { toast } = useToast();
   const isEditing = !!rule;
   const initialRuleType = rule ? ruleTypes.find(rt => rt.ruletype_id === rule.ruletype_id) : null;
@@ -33,6 +35,7 @@ const RuleForm = ({ rule, client, ruleTypes, onSave, onCancel }: RuleFormProps) 
   const [selectedRuleType, setSelectedRuleType] = useState<RuleType | null>(initialRuleType);
   const [formConfig, setFormConfig] = useState<InputFieldConfig[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [duplicateError, setDuplicateError] = useState<Rule | null>(null);
   
   const [inputs, setInputs] = useState<Record<string, string>>(
     rule?.inputs ? 
@@ -94,6 +97,11 @@ const RuleForm = ({ rule, client, ruleTypes, onSave, onCancel }: RuleFormProps) 
         return newErrors;
       });
     }
+    
+    // Clear duplicate error when inputs change
+    if (duplicateError) {
+      setDuplicateError(null);
+    }
   };
 
   const handleSave = () => {
@@ -105,6 +113,27 @@ const RuleForm = ({ rule, client, ruleTypes, onSave, onCancel }: RuleFormProps) 
     Object.entries(inputs).forEach(([key, value]) => {
       processedInputs[key] = value;
     });
+
+    // Check for duplicates only if we're creating a new rule or editing an existing one
+    const isDuplicateCheck = isEditing ? 
+      // When editing, filter out the current rule being edited from duplicate check
+      checkDuplicateRule(
+        rules.filter(r => r.rule_id !== rule?.rule_id),
+        selectedRuleType!.ruletype_id, 
+        processedInputs
+      ) :
+      // New rule creation, check against all rules
+      checkDuplicateRule(rules, selectedRuleType!.ruletype_id, processedInputs);
+
+    if (isDuplicateCheck.isDuplicate) {
+      setDuplicateError(isDuplicateCheck.duplicateRule);
+      toast({
+        title: "Duplicate Rule",
+        description: "A rule with identical inputs already exists",
+        variant: "destructive"
+      });
+      return;
+    }
 
     const updatedRule: Partial<Rule> = {
       ...rule,
@@ -184,6 +213,21 @@ const RuleForm = ({ rule, client, ruleTypes, onSave, onCancel }: RuleFormProps) 
         <CardTitle>{isEditing ? 'Edit Rule' : 'Create New Rule'}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        {duplicateError && (
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Duplicate Rule</AlertTitle>
+            <AlertDescription>
+              A rule with identical inputs already exists in the system.
+              {Object.entries(duplicateError.inputs).map(([key, value]) => (
+                <div key={key} className="text-xs mt-1">
+                  <span className="font-semibold">{key}:</span> {value.toString()}
+                </div>
+              ))}
+            </AlertDescription>
+          </Alert>
+        )}
+
         <div className="space-y-2">
           <Label htmlFor="rule-type">Rule Type</Label>
           <select

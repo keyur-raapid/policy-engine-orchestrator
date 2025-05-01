@@ -1,13 +1,14 @@
-
 import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Rule, RuleType } from '../lib/types';
-import { Upload, Check, Plus, X } from 'lucide-react';
+import { Upload, Check, Plus, X, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { checkDuplicateRule } from '../utils/ruleValidation';
 
 interface MassEntryUploadProps {
   rules: Rule[];
@@ -24,6 +25,9 @@ const MassEntryUpload = ({ rules, ruleTypes, onMassAdd }: MassEntryUploadProps) 
   const [newColumn, setNewColumn] = useState<string>('');
   const [parsedValues, setParsedValues] = useState<Record<string, string>[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [duplicates, setDuplicates] = useState<number>(0);
+  const [showDuplicateWarning, setShowDuplicateWarning] = useState<boolean>(false);
+  const [validEntries, setValidEntries] = useState<Record<string, string>[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const selectedRuleType = ruleTypes.find(rt => rt.ruletype_id.toString() === selectedRuleTypeId);
@@ -162,11 +166,41 @@ const MassEntryUpload = ({ rules, ruleTypes, onMassAdd }: MassEntryUploadProps) 
         return filteredRow;
       });
       
-      onMassAdd(ruleTypeId, filteredData);
+      // Check for duplicates
+      const uniqueEntries: Record<string, string>[] = [];
+      let duplicateCount = 0;
+      
+      filteredData.forEach(entry => {
+        const { isDuplicate } = checkDuplicateRule(rules, ruleTypeId, entry);
+        if (!isDuplicate) {
+          uniqueEntries.push(entry);
+        } else {
+          duplicateCount++;
+        }
+      });
+      
+      setValidEntries(uniqueEntries);
+      setDuplicates(duplicateCount);
+      
+      if (duplicateCount > 0) {
+        setShowDuplicateWarning(true);
+        toast({
+          title: "Duplicate Entries Found",
+          description: `Found ${duplicateCount} duplicate entries that will be skipped.`,
+          variant: "destructive"
+        });
+        
+        if (uniqueEntries.length === 0) {
+          // All entries are duplicates
+          return;
+        }
+      }
+      
+      onMassAdd(ruleTypeId, uniqueEntries);
       
       toast({
         title: "Success",
-        description: `Added ${filteredData.length} entries to selected rule type`,
+        description: `Added ${uniqueEntries.length} entries to selected rule type${duplicateCount > 0 ? `, skipped ${duplicateCount} duplicates` : ''}`,
         variant: "default" 
       });
       
@@ -175,6 +209,9 @@ const MassEntryUpload = ({ rules, ruleTypes, onMassAdd }: MassEntryUploadProps) 
       setParsedValues([]);
       setSelectedColumns([]);
       setAvailableColumns([]);
+      setDuplicates(0);
+      setShowDuplicateWarning(false);
+      setValidEntries([]);
       if (fileInputRef.current) fileInputRef.current.value = '';
     } else {
       if (!selectedRuleTypeId) {
@@ -205,6 +242,17 @@ const MassEntryUpload = ({ rules, ruleTypes, onMassAdd }: MassEntryUploadProps) 
         <CardTitle>Mass Entry Upload</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        {showDuplicateWarning && (
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Duplicate Entries Detected</AlertTitle>
+            <AlertDescription>
+              {duplicates} duplicate entries were found and will be skipped. 
+              Only {validEntries.length} unique entries will be added.
+            </AlertDescription>
+          </Alert>
+        )}
+        
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <label htmlFor="ruletype-select" className="text-sm font-medium">
