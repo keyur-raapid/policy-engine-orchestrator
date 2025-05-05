@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,17 +9,27 @@ import RulesList from '@/components/RulesList';
 import RuleForm from '@/components/RuleForm';
 import RuleTypeManager from '@/components/RuleTypeManager';
 import MassEntryUpload from '@/components/MassEntryUpload';
-import { mockClients, mockRuleTypes, fetchRules } from '@/data/mockData';
 import { Client, Rule, RuleType } from '@/lib/types';
 import { Plus, Settings, File } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { 
+  fetchClients, 
+  fetchRuleTypes, 
+  fetchRulesForClient, 
+  createRule, 
+  updateRule,
+  deleteRule,
+  addRuleType,
+  deleteRuleType
+} from '@/services/api';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 const Index = () => {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+  
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [selectedRuleType, setSelectedRuleType] = useState<RuleType | null>(null);
-  const [rules, setRules] = useState<Rule[]>([]);
-  const [ruleTypes, setRuleTypes] = useState<RuleType[]>(mockRuleTypes);
   const [isCreatingRule, setIsCreatingRule] = useState(false);
   const [editingRule, setEditingRule] = useState<Rule | null>(null);
   const [activeTab, setActiveTab] = useState('rules');
@@ -31,17 +42,137 @@ const Index = () => {
     console.log("Is Creating Rule:", isCreatingRule);
   }, [activeTab, isCreatingRule]);
   
-  useEffect(() => {
-    if (selectedClient) {
-      const fetchedRules = fetchRules(
-        selectedClient.project_id, 
-        selectedRuleType ? selectedRuleType.ruletype_id : undefined
-      );
-      setRules(fetchedRules);
-    } else {
-      setRules([]);
+  // Fetch clients data
+  const { 
+    data: clients = [], 
+    isLoading: isLoadingClients 
+  } = useQuery({
+    queryKey: ['clients'],
+    queryFn: fetchClients
+  });
+  
+  // Fetch rule types data
+  const {
+    data: ruleTypes = [],
+    isLoading: isLoadingRuleTypes
+  } = useQuery({
+    queryKey: ['ruleTypes'],
+    queryFn: fetchRuleTypes
+  });
+  
+  // Fetch rules data based on selected client and rule type
+  const {
+    data: rules = [],
+    isLoading: isLoadingRules
+  } = useQuery({
+    queryKey: ['rules', selectedClient?.project_id, selectedRuleType?.ruletype_id],
+    queryFn: () => selectedClient ? fetchRulesForClient(
+      selectedClient.project_id,
+      selectedRuleType ? selectedRuleType.ruletype_id : undefined
+    ) : [],
+    enabled: !!selectedClient
+  });
+  
+  // Create rule mutation
+  const createRuleMutation = useMutation({
+    mutationFn: createRule,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['rules'] });
+      toast({
+        title: "Rule Created",
+        description: "The new rule has been created successfully.",
+      });
+      setEditingRule(null);
+      setIsCreatingRule(false);
+      setActiveTab('rules');
+    },
+    onError: (error) => {
+      toast({
+        title: "Error Creating Rule",
+        description: `${error}`,
+        variant: "destructive"
+      });
     }
-  }, [selectedClient, selectedRuleType]);
+  });
+  
+  // Update rule mutation
+  const updateRuleMutation = useMutation({
+    mutationFn: updateRule,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['rules'] });
+      toast({
+        title: "Rule Updated",
+        description: "The rule has been updated successfully.",
+      });
+      setEditingRule(null);
+      setIsCreatingRule(false);
+      setActiveTab('rules');
+    },
+    onError: (error) => {
+      toast({
+        title: "Error Updating Rule",
+        description: `${error}`,
+        variant: "destructive"
+      });
+    }
+  });
+  
+  // Delete rule mutation
+  const deleteRuleMutation = useMutation({
+    mutationFn: deleteRule,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['rules'] });
+      toast({
+        title: "Rule Deleted",
+        description: "Rule has been deleted.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error Deleting Rule",
+        description: `${error}`,
+        variant: "destructive"
+      });
+    }
+  });
+  
+  // Add rule type mutation
+  const addRuleTypeMutation = useMutation({
+    mutationFn: addRuleType,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ruleTypes'] });
+      toast({
+        title: "Rule Type Added",
+        description: "New rule type has been created.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error Adding Rule Type",
+        description: `${error}`,
+        variant: "destructive"
+      });
+    }
+  });
+  
+  // Delete rule type mutation
+  const deleteRuleTypeMutation = useMutation({
+    mutationFn: deleteRuleType,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ruleTypes'] });
+      toast({
+        title: "Rule Type Deleted",
+        description: "Rule type has been deleted.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error Deleting Rule Type",
+        description: `${error}`,
+        variant: "destructive"
+      });
+    }
+  });
 
   const handleSelectClient = (client: Client) => {
     setSelectedClient(client);
@@ -77,45 +208,23 @@ const Index = () => {
   };
 
   const handleDeleteRule = (rule: Rule) => {
-    toast({
-      title: "Rule Deleted",
-      description: `Rule ${rule.rule_id} has been deleted.`,
-    });
-    
-    setRules(rules.filter(r => r.rule_id !== rule.rule_id));
+    deleteRuleMutation.mutate(rule.rule_id);
   };
 
   const handleSaveRule = (rule: Partial<Rule>) => {
     if (editingRule) {
       // Update existing rule
-      const updatedRules = rules.map(r => 
-        r.rule_id === editingRule.rule_id ? { ...r, ...rule } : r
-      );
-      setRules(updatedRules);
-      toast({
-        title: "Rule Updated",
-        description: "The rule has been updated successfully.",
-      });
+      updateRuleMutation.mutate({
+        ...editingRule,
+        ...rule
+      } as Rule);
     } else {
       // Create new rule
-      const newRule = {
+      createRuleMutation.mutate({
         ...rule,
-        rule_id: `r${Date.now()}`, // Generate a temporary ID
         version: 1,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      } as Rule;
-      
-      setRules([...rules, newRule]);
-      toast({
-        title: "Rule Created",
-        description: "The new rule has been created successfully.",
-      });
+      } as Omit<Rule, 'rule_id'>);
     }
-    
-    setEditingRule(null);
-    setIsCreatingRule(false);
-    setActiveTab('rules');
   };
 
   const handleCancelRuleForm = () => {
@@ -125,16 +234,11 @@ const Index = () => {
   };
 
   const handleAddRuleType = (newRuleType: Omit<RuleType, 'ruletype_id'>) => {
-    const nextId = Math.max(...ruleTypes.map(rt => rt.ruletype_id)) + 1;
-    const ruleType = {
-      ...newRuleType,
-      ruletype_id: nextId
-    };
-    setRuleTypes([...ruleTypes, ruleType]);
+    addRuleTypeMutation.mutate(newRuleType);
   };
 
   const handleDeleteRuleType = (ruleTypeId: number) => {
-    setRuleTypes(ruleTypes.filter(rt => rt.ruletype_id !== ruleTypeId));
+    deleteRuleTypeMutation.mutate(ruleTypeId);
     
     // If the currently selected rule type is deleted, reset the selection
     if (selectedRuleType && selectedRuleType.ruletype_id === ruleTypeId) {
@@ -166,8 +270,7 @@ const Index = () => {
     }
   };
 
-  const handleMassAdd = (ruleTypeId: number, values: Record<string, string>[]) => {
-    // This would be where you would normally send the data to an API
+  const handleMassAdd = async (ruleTypeId: number, values: Record<string, string>[]) => {
     if (!values || values.length === 0) {
       toast({
         title: "No Data",
@@ -180,32 +283,42 @@ const Index = () => {
     // Find the rule type name for the success message
     const ruleType = ruleTypes.find(rt => rt.ruletype_id === ruleTypeId);
     
-    // Generate new rules based on the imported data
-    const newRules = values.map(value => {
-      return {
-        rule_id: `r${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        project_id: selectedClient?.project_id || 0,
-        category_id: 1, // Default category
-        ruletype_id: ruleTypeId,
-        inputs: value,
-        version: 1,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      } as Rule;
-    });
-    
-    // Add the new rules to the rules array
-    setRules([...rules, ...newRules]);
-    
-    toast({
-      title: "Mass Entry Successful",
-      description: `Added ${values.length} entries to ${ruleType?.name || 'selected rule type'}`,
-      variant: "default"
-    });
-    
-    // Switch back to rules view to show the new rules
-    setActiveTab('rules');
-    setShowMassEntry(false);
+    try {
+      // Create an array of promises for all rules to be created
+      const createPromises = values.map(value => {
+        const newRule = {
+          project_id: selectedClient?.project_id || 0,
+          category_id: 1, // Default category
+          ruletype_id: ruleTypeId,
+          inputs: value,
+          version: 1,
+        } as Omit<Rule, 'rule_id'>;
+        
+        return createRule(newRule);
+      });
+      
+      // Wait for all rules to be created
+      await Promise.all(createPromises);
+      
+      // Invalidate the rules query to refresh the list
+      queryClient.invalidateQueries({ queryKey: ['rules'] });
+      
+      toast({
+        title: "Mass Entry Successful",
+        description: `Added ${values.length} entries to ${ruleType?.name || 'selected rule type'}`,
+        variant: "default"
+      });
+      
+      // Switch back to rules view to show the new rules
+      setActiveTab('rules');
+      setShowMassEntry(false);
+    } catch (error) {
+      toast({
+        title: "Error Adding Rules",
+        description: `${error}`,
+        variant: "destructive"
+      });
+    }
   };
 
   return (
@@ -217,7 +330,7 @@ const Index = () => {
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <ClientSelector 
-          clients={mockClients}
+          clients={clients}
           selectedClient={selectedClient}
           onSelectClient={handleSelectClient}
         />
@@ -255,7 +368,13 @@ const Index = () => {
         </div>
       </div>
       
-      {selectedClient ? (
+      {isLoadingClients ? (
+        <Card>
+          <CardContent className="flex justify-center items-center p-10">
+            <p>Loading clients...</p>
+          </CardContent>
+        </Card>
+      ) : selectedClient ? (
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="w-full mb-6">
             <TabsTrigger value="rules" className="flex-1">Rules List</TabsTrigger>
@@ -284,15 +403,19 @@ const Index = () => {
                   {selectedRuleType && ` - ${selectedRuleType.name}`}
                 </CardTitle>
                 <CardDescription>
-                  {rules.length} rule{rules.length !== 1 ? 's' : ''} found
+                  {isLoadingRules ? 'Loading...' : `${rules.length} rule${rules.length !== 1 ? 's' : ''} found`}
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <RulesList 
-                  rules={rules}
-                  onEditRule={handleEditRule}
-                  onDeleteRule={handleDeleteRule}
-                />
+                {isLoadingRules ? (
+                  <p>Loading rules...</p>
+                ) : (
+                  <RulesList 
+                    rules={rules}
+                    onEditRule={handleEditRule}
+                    onDeleteRule={handleDeleteRule}
+                  />
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -342,7 +465,7 @@ const Index = () => {
               </p>
               <div className="inline-block">
                 <ClientSelector 
-                  clients={mockClients}
+                  clients={clients}
                   selectedClient={selectedClient}
                   onSelectClient={handleSelectClient}
                 />
